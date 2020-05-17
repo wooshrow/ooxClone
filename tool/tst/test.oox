@@ -1,0 +1,30 @@
+class Main
+{
+    static void main(int[] value)
+     //   requires(forall v, i : values : v == 3)
+     //   exceptional(false)
+    {
+        assert value != null;
+    }
+
+    static int add(int x, int y)
+    {
+        return x + y;
+    }
+}
+
+class Number
+{
+    int value;
+
+    Number(int x) 
+    {
+        this.value := x;
+    }
+
+    int getValue()
+    {
+        int value := this.value;
+        return value;
+    }
+}

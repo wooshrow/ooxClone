@@ -1,0 +1,41 @@
+class Main {
+    static void main()
+        exceptional(false)
+    {
+        int n := 2;
+        Fork[] forks := new Fork[n];
+        int i := 0;
+
+        while (i < n) {
+            forks[i] := new Fork();
+            i := i + 1;
+        }
+
+        i := 0;
+        while (i < n) {
+            Fork left := forks[i];
+            Fork right := forks[(i + 1) % n];
+            fork Main.eat(left, right);
+            i := i + 1;
+        }
+        join;
+    }
+
+    static void eat(Fork left, Fork right)
+    {
+        while (true)
+        {
+            lock (left)
+            {
+                lock (right)
+                {
+                    ;
+                }
+            }
+        }
+    }
+}
+
+class Fork {
+    Fork() { ; }
+}

@@ -1,0 +1,22 @@
+class Main
+{
+    static void main(List list)
+        exceptional(true)
+    {
+        List next := list;
+        next := next.next;
+        next := next.next;
+        next := next.next;
+        assert next != next;
+    }
+}
+
+class List
+{
+    List next;
+
+    List()
+    {
+        ;
+    }
+}
