@@ -1,7 +1,9 @@
 module Parsing.Parser where
 
 import           Control.Monad     (when)
-import           Text.Parsec       hiding (Empty)
+import           Text.Parsec       hiding (getPosition, Empty)
+import qualified Text.Parsec       as P (getPosition)
+import qualified Text.Parsec.Pos   as P (SourcePos, newPos)
 import           Text.Parsec.Error
 import qualified Data.Set          as S
 import           Text.Pretty
@@ -16,7 +18,7 @@ type P = Parsec [Positioned Token] ()
 parser :: FilePath -> [Positioned Token] -> Erroneous CompilationUnit
 parser fileName tokens =
     case parse pCompilationUnit fileName tokens of
-        Left err     -> Left $ syntacticalError (errorPos err) (getErrorMessage err)
+        Left err     -> Left $ syntacticalError (sourcePosToPosition (errorPos err)) (getErrorMessage err)
         Right result -> Right result
 
 getErrorMessage :: ParseError -> String
@@ -413,7 +415,7 @@ pIntLit = do
     token showToken (posFromToken sourceName) (matchToken sourceName)
     where
         showToken (Positioned _ tok') = toString tok'
-        matchToken name (Positioned pos (TIntLiteral value)) = intLiteral value (setSourceName pos name)
+        matchToken name (Positioned pos (TIntLiteral value)) = intLiteral value (pos{sourceFile=name})
         matchToken _    _                                    = Nothing
         intLiteral value pos = Just $ IntLit value pos
           --  | value >= 0       && value < (2^32) = Just $ UIntLit value
@@ -503,7 +505,6 @@ pToken tok = do
     where
         showToken (Positioned _ tok') = toString tok'
         matchToken (Positioned _ tok') = if tok == tok' then Just () else Nothing
-        posFromToken name (Positioned pos _) = setSourceName pos name
 
 pSemicolon :: P ()
 pSemicolon = pToken TSemicolon
@@ -544,18 +545,22 @@ pSClose = pToken TSClose
 pBetweenSquare :: P a -> P a
 pBetweenSquare = between pSOpen pSClose
 
-posFromToken :: SourceName -> Positioned a -> SourcePos
-posFromToken name (Positioned pos _) = setSourceName pos name
+posFromToken :: SourceName -> Positioned a -> P.SourcePos
+posFromToken sourceFile (Positioned (SourcePos _ sourceLine sourceColumn) _) 
+    = P.newPos sourceFile sourceLine sourceColumn
 
 getSourceName :: P SourceName
-getSourceName = sourceName <$> getPosition
+getSourceName = sourceFile <$> getPosition
+
+getPosition :: P Position
+getPosition = sourcePosToPosition <$> P.getPosition
 
 chainlUnary1 :: P a -> P (a -> a) -> P a
 chainlUnary1 p op = do
     fs <- many op
     x  <- p
     return $ foldr id x fs
-        
+
 --------------------------------------------------------------------------------
 -- Exception Statement Creation
 --------------------------------------------------------------------------------
@@ -571,11 +576,7 @@ exceptionalStatement _
     = S.empty
 
 exceptionalAssignment :: Lhs -> Rhs -> S.Set Expression
-exceptionalAssignment lhs rhs
-    = exceptionalLhs lhs `S.union` exceptionalRhs rhs
-        --case catMaybes [exceptionalLhs lhs, exceptionalRhs rhs] of
-        --[] -> Nothing
-        --ms -> Just $ foldr1 or' ms
+exceptionalAssignment lhs rhs = exceptionalLhs lhs `S.union` exceptionalRhs rhs
         
 exceptionalLhs :: Lhs -> S.Set Expression
 exceptionalLhs LhsVar{}     = S.empty
@@ -604,9 +605,6 @@ exceptionalInvocation invocation
     = if null (nonNullLhs `S.union` exceptionalArgs)
         then S.empty
         else S.singleton (ors' (nonNullLhs `S.union` exceptionalArgs))
-        --case nonNullLhs ++ exceptionalArgs of
-        --[] -> Nothing
-        --ms -> Just $ ors' ms
     where
         exceptionalArgs = S.unions (map exceptionalExpression (_arguments invocation))
         nonNullLhs -- if is non-static a method, lhs must be non-null
@@ -647,20 +645,20 @@ exceptionalExpression exp
 -- Statement Creation
 --------------------------------------------------------------------------------
 
-createExceptionalItes :: S.Set Expression -> Statement -> SourcePos -> Statement
+createExceptionalItes :: S.Set Expression -> Statement -> Position -> Statement
 createExceptionalItes exceptions body pos
     = S.foldr ( \ exception stat -> createExceptionalIte exception stat pos) body exceptions
 
-createExceptionalIte :: Expression -> Statement -> SourcePos -> Statement
+createExceptionalIte :: Expression -> Statement -> Position -> Statement
 createExceptionalIte guard stat pos = createIte guard (Throw "exception" unknownLabel pos) stat pos
 
-createIte :: Expression -> Statement -> Statement -> SourcePos -> Statement
+createIte :: Expression -> Statement -> Statement -> Position -> Statement
 createIte guard trueS falseS pos
     = let trueBranch  = Block (Seq (Assume guard unknownLabel pos) trueS unknownLabel pos) unknownLabel pos
           falseBranch = Block (Seq (Assume (neg' guard) unknownLabel pos) falseS unknownLabel pos) unknownLabel pos
        in Ite guard trueBranch falseBranch unknownLabel pos
 
-createWhile :: Expression -> Statement -> SourcePos -> Statement
+createWhile :: Expression -> Statement -> Position -> Statement
 createWhile guard body pos
     = let body' = Block (Seq (Assume guard unknownLabel pos) body unknownLabel pos) unknownLabel pos
        in Seq (While guard body' unknownLabel pos) (Assume (neg' guard) unknownLabel pos) unknownLabel pos

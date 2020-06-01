@@ -91,7 +91,7 @@ typeSpecification currentMethod specification = do
     requires' <- typeMaybeExpression (specification ^. SL.requires)
     matchMaybeType requires' BoolRuntimeType
     ensures' <- inNewScope (do
-        when (not (currentMethod `isOfType` VoidRuntimeType))
+        unless (currentMethod `isOfType` VoidRuntimeType)
             (declareVar (Identifier "retval" unknownPos) (typeOf currentMethod))
         typeMaybeExpression (specification ^. SL.ensures))
     matchMaybeType ensures' BoolRuntimeType

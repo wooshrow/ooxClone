@@ -32,15 +32,15 @@ import           Syntax.Pretty()
 --------------------------------------------------------------------------------
 
 verifyM  :: (HasConfiguration a, Members [State Statistics, Reader a, Embed IO, Error VerificationResult] r)
-    => [CFGContext] -> M.Map Identifier (S.Set Expression) -> SourcePos -> Maybe Expression -> Sem r ()
+    => [CFGContext] -> M.Map Identifier (S.Set Expression) -> Position -> Maybe Expression -> Sem r ()
 verifyM programTrace aliases pos = maybe (return ()) (verify programTrace aliases pos)
 
 verify :: (HasConfiguration a, Members [State Statistics, Reader a, Embed IO, Error VerificationResult] r)
-    => [CFGContext] -> M.Map Identifier (S.Set Expression) -> SourcePos -> Expression -> Sem r ()
-verify programTrace aliases pos = void . verifyEach programTrace pos . map fst . concretize aliases
+    => [CFGContext] -> M.Map Identifier (S.Set Expression) -> Position -> Expression -> Sem r ()
+verify programTrace aliases pos = void . verifyEach programTrace pos . concretize aliases
 
 verifyEach :: (HasConfiguration a, Members [State Statistics, Reader a, Embed IO, Error VerificationResult] r)
-    => [CFGContext] -> SourcePos -> [Expression] -> Sem r Result
+    => [CFGContext] -> Position -> [Expression] -> Sem r Result
 verifyEach _            _   []     = return Unsat
 verifyEach programTrace pos (n:ns) = do
     debug ("Verifying: " ++ toString n)
@@ -55,17 +55,14 @@ verifyEach programTrace pos (n:ns) = do
 -- Verification Engine
 --------------------------------------------------------------------------------
 
-concretize :: AliasMap -> Expression -> [(Expression, Concretization)]
-concretize = conretizeOfType REFRuntimeType
-
-conretizeOfType :: RuntimeType -> AliasMap -> Expression -> [(Expression, Concretization)]
-conretizeOfType ty aliases formula
-    | refs <- findSymbolicRefsOfType ty formula
+concretize :: AliasMap -> Expression -> [Expression]
+concretize aliases formula
+    | refs <- findSymbolicRefs formula
     , not (null refs) 
-        = let mappings = map (\ ref -> map (ref ^?! SL.var, ) (maybe (error "conretizeOfType") S.toList (aliases M.!? (ref ^?! SL.var)))) (S.toList refs)
-           in map (\ p -> (makeConcrete (M.fromList p) formula, M.fromList p)) (cartesianProduct mappings)
+        = let mappings = map (\ ref -> map (ref ^?! SL.var, ) (maybe (error "concretize") S.toList (aliases M.!? (ref ^?! SL.var)))) (S.toList refs)
+           in map (\ p -> makeConcrete (M.fromList p) formula) (cartesianProduct mappings)
     | otherwise
-        = [(formula, M.empty)]
+        = [formula]
 
 makeConcrete :: Concretization -> Expression -> Expression
 makeConcrete substitutions = foldExpression algebra
@@ -73,11 +70,11 @@ makeConcrete substitutions = foldExpression algebra
         algebra = identityExpressionAlgebra
             { fSymRef = \ ref _ _ -> fromMaybe (error ("makeConcrete: " ++ toString ref)) (substitutions M.!? ref) }
         
-findSymbolicRefsOfType :: RuntimeType -> Expression -> S.Set Expression
-findSymbolicRefsOfType ty = foldExpression algebra
+findSymbolicRefs :: Expression -> S.Set Expression
+findSymbolicRefs = foldExpression algebra
     where
         algebra = monoidExpressionAlgebra
-            { fSymRef = \ symVar varTy varPos -> if varTy `isOfType` ty then S.singleton (SymbolicRef symVar varTy varPos) else S.empty }
+            { fSymRef = \ symVar varTy varPos -> S.singleton (SymbolicRef symVar varTy varPos) }
 
 verifyZ3 :: Expression -> Z3 Result
 verifyZ3 formula= (assert =<< construct formula) >> check

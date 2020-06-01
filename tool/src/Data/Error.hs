@@ -12,7 +12,7 @@ import           Syntax.Pretty()
 type Erroneous a = Either ErrorMessage a
 
 data ErrorMessage
-    = ErrorMessage { position :: Maybe SourcePos, err :: ErrorType }
+    = ErrorMessage { position :: Maybe Position, err :: ErrorType }
     deriving (Show)
 
 instance Pretty ErrorMessage where
@@ -31,10 +31,10 @@ instance Pretty ErrorType where
     pretty SyntacticalError{..} = pretty message
     pretty SemanticalError{..}  = pretty message
 
-lexicalError :: SourcePos -> String -> ErrorMessage
+lexicalError :: Position -> String -> ErrorMessage
 lexicalError pos = ErrorMessage (Just pos) . LexicalError 
 
-syntacticalError :: SourcePos -> String -> ErrorMessage
+syntacticalError :: Position -> String -> ErrorMessage
 syntacticalError pos = ErrorMessage (Just pos) . SyntacticalError
 
 readOfUndeclaredVarError :: Identifier -> ErrorMessage
@@ -47,7 +47,7 @@ writeToUndeclaredVarError (Identifier var pos)
     = ErrorMessage (Just pos) $ SemanticalError
         ("Write to undeclared variable '" ++ var ++ "'")
 
-unificationError :: SourcePos -> RuntimeType -> RuntimeType -> ErrorMessage
+unificationError :: Position -> RuntimeType -> RuntimeType -> ErrorMessage
 unificationError pos expected actual
     = ErrorMessage (Just pos) $ SemanticalError
         ("Expected type '" ++ toString expected ++ "' but is of type '" ++ toString actual  ++ "'")
@@ -96,7 +96,7 @@ continueOrBreakNotInWhileError stat
             | SL._Continue `is` stat = "continue;"
             | otherwise              = error "'continueOrBreakNotInWhile' called with a statement that is not a 'continue' or 'break'"
 
-expectedReturnValueError :: RuntimeType -> SourcePos -> ErrorMessage
+expectedReturnValueError :: RuntimeType -> Position -> ErrorMessage
 expectedReturnValueError expectedType pos 
     = ErrorMessage (Just pos) $ SemanticalError
         ("Expected a return statement with an expression of type '" 

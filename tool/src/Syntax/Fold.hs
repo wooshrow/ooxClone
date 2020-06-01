@@ -12,25 +12,25 @@ import Data.Positioned
 import Syntax.Syntax
 
 type StatementAlgebra r
-    = ( NonVoidType -> Identifier -> Label -> SourcePos -> r         -- Declaration
-      , Lhs -> Rhs -> Label -> SourcePos -> r                        -- Assignment
-      , Invocation -> Label -> SourcePos -> r                        -- Call
-      , Label -> SourcePos -> r                                      -- Skip
-      , Expression -> Label -> SourcePos -> r                        -- Assert
-      , Expression -> Label -> SourcePos -> r                        -- Assume
-      , Expression -> r -> Label -> SourcePos -> r                   -- While
-      , Expression -> r -> r -> Label -> SourcePos -> r              -- Ite
-      , Label -> SourcePos -> r                                      -- Continue
-      , Label -> SourcePos -> r                                      -- Break
-      , Maybe Expression -> Label -> SourcePos -> r                  -- Return
-      , String -> Label -> SourcePos -> r                            -- Throw
-      , r -> r -> Label -> Label -> Label -> Label -> SourcePos -> r -- Try
-      , r -> Label -> SourcePos -> r                                 -- Block
-      , Identifier -> Label -> SourcePos -> r                        -- Lock
-      , Identifier -> Label -> SourcePos -> r                        -- Unlock
-      , Invocation -> Label -> SourcePos -> r                        -- Fork
-      , Label -> SourcePos -> r                                      -- Join
-      , r -> r -> Label -> SourcePos -> r)                           -- Seq
+    = ( NonVoidType -> Identifier -> Label -> Position -> r         -- Declaration
+      , Lhs -> Rhs -> Label -> Position -> r                        -- Assignment
+      , Invocation -> Label -> Position -> r                        -- Call
+      , Label -> Position -> r                                      -- Skip
+      , Expression -> Label -> Position -> r                        -- Assert
+      , Expression -> Label -> Position -> r                        -- Assume
+      , Expression -> r -> Label -> Position -> r                   -- While
+      , Expression -> r -> r -> Label -> Position -> r              -- Ite
+      , Label -> Position -> r                                      -- Continue
+      , Label -> Position -> r                                      -- Break
+      , Maybe Expression -> Label -> Position -> r                  -- Return
+      , String -> Label -> Position -> r                            -- Throw
+      , r -> r -> Label -> Label -> Label -> Label -> Position -> r -- Try
+      , r -> Label -> Position -> r                                 -- Block
+      , Identifier -> Label -> Position -> r                        -- Lock
+      , Identifier -> Label -> Position -> r                        -- Unlock
+      , Invocation -> Label -> Position -> r                        -- Fork
+      , Label -> Position -> r                                      -- Join
+      , r -> r -> Label -> Position -> r)                           -- Seq
 
 foldStatement :: StatementAlgebra r -> Statement -> r
 foldStatement (fDeclaration, fAssignment, fCall, fSkip, fAssert, fAssume, fWhile, fIte, fContinue, fBreak, fReturn, fThrow, fTry, fBlock, fLock, fUnlock, fFork, fJoin, fSeq)
@@ -58,17 +58,17 @@ foldStatement (fDeclaration, fAssignment, fCall, fSkip, fAssert, fAssume, fWhile
         
 data ExpressionAlgebra r 
     = ExpressionAlgebra 
-    { fForall :: Identifier -> Identifier -> Identifier -> r -> RuntimeType -> SourcePos -> r
-    , fExists :: Identifier -> Identifier -> Identifier -> r -> RuntimeType -> SourcePos -> r
-    , fBinOp  :: BinOp -> r -> r -> RuntimeType -> SourcePos -> r
-    , fUnOp   :: UnOp -> r -> RuntimeType -> SourcePos -> r 
-    , fVar    :: Identifier -> RuntimeType -> SourcePos -> r
-    , fSymVar :: Identifier -> RuntimeType -> SourcePos -> r
-    , fLit    :: Lit -> RuntimeType -> SourcePos -> r
-    , fSizeOf :: Identifier -> RuntimeType -> SourcePos -> r
-    , fRef    :: Int -> RuntimeType -> SourcePos -> r
-    , fSymRef :: Identifier -> RuntimeType -> SourcePos -> r
-    , fIte    :: r -> r -> r -> RuntimeType -> SourcePos -> r }
+    { fForall :: Identifier -> Identifier -> Identifier -> r -> RuntimeType -> Position -> r
+    , fExists :: Identifier -> Identifier -> Identifier -> r -> RuntimeType -> Position -> r
+    , fBinOp  :: BinOp -> r -> r -> RuntimeType -> Position -> r
+    , fUnOp   :: UnOp -> r -> RuntimeType -> Position -> r 
+    , fVar    :: Identifier -> RuntimeType -> Position -> r
+    , fSymVar :: Identifier -> RuntimeType -> Position -> r
+    , fLit    :: Lit -> RuntimeType -> Position -> r
+    , fSizeOf :: Identifier -> RuntimeType -> Position -> r
+    , fRef    :: Int -> RuntimeType -> Position -> r
+    , fSymRef :: Identifier -> RuntimeType -> Position -> r
+    , fIte    :: r -> r -> r -> RuntimeType -> Position -> r }
     
 monoidExpressionAlgebra :: Monoid r => ExpressionAlgebra r
 monoidExpressionAlgebra = ExpressionAlgebra
@@ -79,7 +79,7 @@ monoidExpressionAlgebra = ExpressionAlgebra
     , fVar    = \ _ _ _                -> mempty
     , fSymVar = \ _ _ _                -> mempty
     , fLit    = \ _ _ _                -> mempty
-    , fSizeOf = \ var _ _              -> mempty
+    , fSizeOf = \ _ _ _                -> mempty
     , fRef    = \ _ _ _                -> mempty
     , fSymRef = \ _ _ _                -> mempty
     , fIte    = \ guard true false _ _ -> guard <> true <> false }
@@ -93,7 +93,7 @@ monoidMExpressionAlgebra = ExpressionAlgebra
     , fVar    = \ _ _ _                -> return mempty
     , fSymVar = \ _ _ _                -> return mempty
     , fLit    = \ _ _ _                -> return mempty
-    , fSizeOf = \ var _ _              -> return mempty
+    , fSizeOf = \ _ _ _                -> return mempty
     , fRef    = \ _ _ _                -> return mempty
     , fSymRef = \ _ _ _                -> return mempty
     , fIte    = \ guard true false _ _ -> (\ g t f -> g <> t <> f) <$> guard <*> true <*> false }

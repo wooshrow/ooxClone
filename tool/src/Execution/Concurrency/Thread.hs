@@ -127,7 +127,7 @@ substitute thread0 expression = foldExpression substitutionAlgebra expression th
                 false1 <- false0 thread
                 return (IteE guard1 true1 false1 ty pos) }
 
-substituteQuantifier :: ([Expression] -> Expression) -> Identifier -> Identifier -> Identifier -> (Thread -> Engine r Expression) -> RuntimeType -> SourcePos -> Thread -> Engine r Expression
+substituteQuantifier :: ([Expression] -> Expression) -> Identifier -> Identifier -> Identifier -> (Thread -> Engine r Expression) -> RuntimeType -> Position -> Thread -> Engine r Expression
 substituteQuantifier quantifier elem range domain formula _ _ thread0 = do
     ref <- readVar thread0 domain
     processRef ref

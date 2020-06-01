@@ -9,8 +9,8 @@ import Analysis.CFA.CFG
 
 data VerificationResult
     = Valid
-    | Invalid SourcePos [CFGContext]
-    | Unknown SourcePos [CFGContext]
+    | Invalid Position [CFGContext]
+    | Unknown Position [CFGContext]
     | Deadlock [CFGContext]
     | Infeasible
 

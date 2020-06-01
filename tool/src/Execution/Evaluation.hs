@@ -95,7 +95,7 @@ evaluate thread0 expression = foldExpression algebra expression thread0
                         false1 <- false0 thread
                         return $ IteE guard1 true1 false1 ty pos }
 
-evaluateQuantifier :: ([Expression] -> Expression) -> Identifier -> Identifier -> Identifier -> (Thread -> Engine r Expression) -> RuntimeType -> SourcePos -> Thread -> Engine r Expression
+evaluateQuantifier :: ([Expression] -> Expression) -> Identifier -> Identifier -> Identifier -> (Thread -> Engine r Expression) -> RuntimeType -> Position -> Thread -> Engine r Expression
 evaluateQuantifier quantifier elem range domain formula0 _ _ thread0 = do
     ref <- readVar thread0 domain
     processRef ref
@@ -114,7 +114,7 @@ evaluateQuantifier quantifier elem range domain formula0 _ _ thread0 = do
         (error "evaluateQuantifierAsBool: symbolic reference")
         infeasible
 
-evaluateBinOp :: BinOp -> Expression -> Expression ->  RuntimeType -> SourcePos -> Engine r Expression
+evaluateBinOp :: BinOp -> Expression -> Expression ->  RuntimeType -> Position -> Engine r Expression
 -- Boolean Evaluation
 evaluateBinOp op (Lit (BoolLit a _) _ _) (Lit (BoolLit b _) _ _) ty pos = do
     let lit = case op of Implies  -> BoolLit (not a || b); And   -> BoolLit (a && b)
@@ -171,7 +171,7 @@ evaluateBinOp op expressionA@(SymbolicRef a _ _) expressionB@(SymbolicRef b _ _)
 evaluateBinOp op expressionA expressionB ty pos =
     return $ BinOp op expressionA expressionB ty pos
 
-evaluateUnOp :: UnOp -> Expression -> RuntimeType -> SourcePos -> Engine r Expression
+evaluateUnOp :: UnOp -> Expression -> RuntimeType -> Position -> Engine r Expression
 -- Negative Evaluation
 evaluateUnOp Negative (Lit (IntLit value litPos) _ _) ty pos = return $ Lit (IntLit (-value) litPos) ty pos
 evaluateUnOp Negative expression                      ty pos = return $ UnOp Negative expression ty pos

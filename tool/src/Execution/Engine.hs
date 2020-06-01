@@ -39,6 +39,8 @@ import           Execution.Evaluation
 import           Verification.Verifier
 import           Verification.Result
 
+import Debug.Trace
+
 --------------------------------------------------------------------------------
 -- Symbolic Execution
 --------------------------------------------------------------------------------
@@ -387,7 +389,10 @@ execRhs thread rhs@RhsExpression{} continueF = do
     branchC_ thread concretizations $ do
         localSolving <- applyLocalSolver <$> askConfig
         if localSolving
-            then evaluate thread (rhs ^?! SL.value) >>= continueF
+            then do
+                value' <- evaluate thread (rhs ^?! SL.value)
+                debug ("Evaluated rhs '" ++ toString rhs ++ "' to '" ++ toString value' ++ "'")
+                continueF value'
             else substitute thread (rhs ^?! SL.value) >>= continueF
 
 execRhs thread rhs@RhsField{} continueF = do
@@ -499,9 +504,7 @@ branchCS_ thread (cs:css) continueF = branchC_ thread cs (branchCS_ thread css c
 branchC_ :: Thread -> [Concretization] -> Engine r () -> Engine r ()
 branchC_ _      [] continueF = continueF
 branchC_ thread cs continueF = branch_ (\ concretization -> do
-    mapM_ (\ (symRef, concRef) -> do
-        setAliases symRef (S.singleton concRef)
-        assume thread (equal' (symbolicVar' symRef (typeOf concRef)) concRef)) (M.toList concretization)
+    mapM_ (\ (symRef, concRef) -> setAliases symRef (S.singleton concRef)) (M.toList concretization)
     continueF) cs
 
 concretesOfTypeM :: Thread -> RuntimeType -> Maybe Expression -> Engine r [Concretization]

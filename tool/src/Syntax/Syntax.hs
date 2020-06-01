@@ -31,11 +31,11 @@ import Data.Hashable
 --------------------------------------------------------------------------------
 
 data CompilationUnit
-    = CompilationUnit { _members :: [Declaration], _info :: SourcePos }
+    = CompilationUnit { _members :: [Declaration], _info :: Position }
     deriving (Show)
 
 data Declaration
-    = Class { _name :: Identifier, _members :: [DeclarationMember], _info :: SourcePos }
+    = Class { _name :: Identifier, _members :: [DeclarationMember], _info :: Position }
     deriving (Show)
 
 instance Eq Declaration where
@@ -47,12 +47,12 @@ instance Ord Declaration where
 data DeclarationMember
     = Constructor { _name          :: Identifier    , _params :: [Parameter]
                   , _specification :: Specification , _body   :: Statement
-                  , _labels        :: (Label, Label), _info   :: SourcePos }
+                  , _labels        :: (Label, Label), _info   :: Position }
     | Method { _isStatic      :: Bool          , _returnTy :: Type
              , _name          :: Identifier    , _params   :: [Parameter]
              , _specification :: Specification , _body     :: Statement
-             , _labels        :: (Label, Label), _info     :: SourcePos }
-    | Field  { _ty :: NonVoidType, _name :: Identifier, _info :: SourcePos }
+             , _labels        :: (Label, Label), _info     :: Position }
+    | Field  { _ty :: NonVoidType, _name :: Identifier, _info :: Position }
     deriving (Show)
 
 instance Eq DeclarationMember where
@@ -65,14 +65,14 @@ instance WithPos DeclarationMember where
     getPos = _info
 
 data Parameter
-    = Parameter { _ty :: NonVoidType, _name :: Identifier, _info :: SourcePos }
+    = Parameter { _ty :: NonVoidType, _name :: Identifier, _info :: Position }
     deriving (Show)
 
 data Specification
     = Specification { _requires    :: Maybe Expression
                     , _ensures     :: Maybe Expression
                     , _exceptional :: Maybe Expression
-                    , _info        :: SourcePos }
+                    , _info        :: Position }
     deriving (Show)
 
 --------------------------------------------------------------------------------
@@ -80,25 +80,25 @@ data Specification
 --------------------------------------------------------------------------------
 
 data Statement
-    = Declare { _ty :: NonVoidType, _var :: Identifier, _label :: Label, _info :: SourcePos }
-    | Assign { _lhs :: Lhs, _rhs :: Rhs, _label :: Label, _info :: SourcePos }
-    | Call { _invocation :: Invocation, _label :: Label, _info :: SourcePos }
-    | Skip { _label :: Label, _info :: SourcePos }
-    | Assert { _assertion :: Expression, _label :: Label, _info :: SourcePos }
-    | Assume { _assumption :: Expression, _label :: Label, _info :: SourcePos }
-    | While { _guard :: Expression, _body :: Statement, _label :: Label, _info :: SourcePos }
-    | Ite { _guard :: Expression, _trueBody :: Statement, _falseBody :: Statement, _label :: Label, _info :: SourcePos }
-    | Continue { _label :: Label, _info :: SourcePos }
-    | Break { _label :: Label, _info :: SourcePos }
-    | Return { _expression :: Maybe Expression, _label :: Label, _info :: SourcePos }
-    | Throw { _message :: String, _label :: Label, _info :: SourcePos }
-    | Try { _tryBody :: Statement, _catchBody :: Statement, _label :: Label, _label2 :: Label, _label3 :: Label, _label4 :: Label, _info :: SourcePos }
-    | Block { _body :: Statement, _label :: Label, _info :: SourcePos }
-    | Lock { _var :: Identifier, _label :: Label, _info :: SourcePos }
-    | Unlock { _var :: Identifier, _label :: Label, _info :: SourcePos }
-    | Fork { _invocation :: Invocation, _label :: Label, _info :: SourcePos }
-    | Join { _label :: Label, _info :: SourcePos }
-    | Seq { _stat1 :: Statement, _stat2 :: Statement, _label :: Label, _info :: SourcePos }
+    = Declare { _ty :: NonVoidType, _var :: Identifier, _label :: Label, _info :: Position }
+    | Assign { _lhs :: Lhs, _rhs :: Rhs, _label :: Label, _info :: Position }
+    | Call { _invocation :: Invocation, _label :: Label, _info :: Position }
+    | Skip { _label :: Label, _info :: Position }
+    | Assert { _assertion :: Expression, _label :: Label, _info :: Position }
+    | Assume { _assumption :: Expression, _label :: Label, _info :: Position }
+    | While { _guard :: Expression, _body :: Statement, _label :: Label, _info :: Position }
+    | Ite { _guard :: Expression, _trueBody :: Statement, _falseBody :: Statement, _label :: Label, _info :: Position }
+    | Continue { _label :: Label, _info :: Position }
+    | Break { _label :: Label, _info :: Position }
+    | Return { _expression :: Maybe Expression, _label :: Label, _info :: Position }
+    | Throw { _message :: String, _label :: Label, _info :: Position }
+    | Try { _tryBody :: Statement, _catchBody :: Statement, _label :: Label, _label2 :: Label, _label3 :: Label, _label4 :: Label, _info :: Position }
+    | Block { _body :: Statement, _label :: Label, _info :: Position }
+    | Lock { _var :: Identifier, _label :: Label, _info :: Position }
+    | Unlock { _var :: Identifier, _label :: Label, _info :: Position }
+    | Fork { _invocation :: Invocation, _label :: Label, _info :: Position }
+    | Join { _label :: Label, _info :: Position }
+    | Seq { _stat1 :: Statement, _stat2 :: Statement, _label :: Label, _info :: Position }
     deriving (Show)
 
 instance Eq Statement where
@@ -108,8 +108,8 @@ instance WithPos Statement where
     getPos = _info
 
 data Invocation
-    = InvokeMethod { _lhs :: Identifier, _rhs :: Identifier, _arguments :: [Expression], _resolved :: Maybe (Declaration, DeclarationMember), _label :: Label, _info :: SourcePos }
-    | InvokeConstructor { _className :: Identifier, _arguments :: [Expression], _resolved :: Maybe (Declaration, DeclarationMember), _label :: Label, _info :: SourcePos }
+    = InvokeMethod { _lhs :: Identifier, _rhs :: Identifier, _arguments :: [Expression], _resolved :: Maybe (Declaration, DeclarationMember), _label :: Label, _info :: Position }
+    | InvokeConstructor { _className :: Identifier, _arguments :: [Expression], _resolved :: Maybe (Declaration, DeclarationMember), _label :: Label, _info :: Position }
     deriving (Show)
  
 instance Eq Invocation where
@@ -119,17 +119,17 @@ instance WithPos Invocation where
     getPos = _info
 
 data Lhs
-    = LhsVar   { _var :: Identifier, _ty :: RuntimeType, _info :: SourcePos }
-    | LhsField { _var :: Identifier, _varTy :: RuntimeType, _field :: Identifier, _ty :: RuntimeType, _info :: SourcePos }
-    | LhsElem  { _var :: Identifier, _index :: Expression, _ty :: RuntimeType, _info :: SourcePos }
+    = LhsVar   { _var :: Identifier, _ty :: RuntimeType, _info :: Position }
+    | LhsField { _var :: Identifier, _varTy :: RuntimeType, _field :: Identifier, _ty :: RuntimeType, _info :: Position }
+    | LhsElem  { _var :: Identifier, _index :: Expression, _ty :: RuntimeType, _info :: Position }
     deriving (Eq, Show)
 
 data Rhs
-    = RhsExpression { _value :: Expression, _ty :: RuntimeType, _info :: SourcePos }
-    | RhsField { _var :: Expression, _field :: Identifier, _ty :: RuntimeType, _info :: SourcePos }
-    | RhsElem { _var :: Expression, _index :: Expression, _ty :: RuntimeType, _info :: SourcePos }
-    | RhsCall { _invocation :: Invocation, _ty :: RuntimeType, _info :: SourcePos }
-    | RhsArray { _arrayTy :: NonVoidType, _sizes :: [Expression], _ty :: RuntimeType, _info :: SourcePos }
+    = RhsExpression { _value :: Expression, _ty :: RuntimeType, _info :: Position }
+    | RhsField { _var :: Expression, _field :: Identifier, _ty :: RuntimeType, _info :: Position }
+    | RhsElem { _var :: Expression, _index :: Expression, _ty :: RuntimeType, _info :: Position }
+    | RhsCall { _invocation :: Invocation, _ty :: RuntimeType, _info :: Position }
+    | RhsArray { _arrayTy :: NonVoidType, _sizes :: [Expression], _ty :: RuntimeType, _info :: Position }
     deriving (Eq, Show)
 
 instance WithPos Rhs where
@@ -142,17 +142,17 @@ instance WithPos Rhs where
 type Reference = Int
 
 data Expression
-    = Forall      { _elem :: Identifier, _range :: Identifier, _domain :: Identifier, _formula :: Expression, _ty :: RuntimeType, _info :: SourcePos }
-    | Exists      { _elem :: Identifier, _range :: Identifier, _domain :: Identifier, _formula :: Expression, _ty :: RuntimeType, _info :: SourcePos }
-    | BinOp       { _binOp :: BinOp, _lhs :: Expression, _rhs :: Expression, _ty :: RuntimeType, _info :: SourcePos }
-    | UnOp        { _unOp :: UnOp, _value :: Expression, _ty :: RuntimeType, _info :: SourcePos }
-    | Var         { _var :: Identifier, _ty :: RuntimeType, _info :: SourcePos }
-    | SymbolicVar { _var :: Identifier, _ty :: RuntimeType, _info :: SourcePos }
-    | Lit         { _lit :: Lit, _ty :: RuntimeType, _info :: SourcePos }
-    | SizeOf      { _var :: Identifier, _ty :: RuntimeType, _info :: SourcePos }
-    | Ref         { _ref :: Reference, _ty :: RuntimeType, _info :: SourcePos }
-    | SymbolicRef { _var :: Identifier, _ty :: RuntimeType, _info :: SourcePos }
-    | IteE        { _guard :: Expression, _true :: Expression, _false :: Expression, _ty :: RuntimeType, _info :: SourcePos }
+    = Forall      { _elem :: Identifier, _range :: Identifier, _domain :: Identifier, _formula :: Expression, _ty :: RuntimeType, _info :: Position }
+    | Exists      { _elem :: Identifier, _range :: Identifier, _domain :: Identifier, _formula :: Expression, _ty :: RuntimeType, _info :: Position }
+    | BinOp       { _binOp :: BinOp, _lhs :: Expression, _rhs :: Expression, _ty :: RuntimeType, _info :: Position }
+    | UnOp        { _unOp :: UnOp, _value :: Expression, _ty :: RuntimeType, _info :: Position }
+    | Var         { _var :: Identifier, _ty :: RuntimeType, _info :: Position }
+    | SymbolicVar { _var :: Identifier, _ty :: RuntimeType, _info :: Position }
+    | Lit         { _lit :: Lit, _ty :: RuntimeType, _info :: Position }
+    | SizeOf      { _var :: Identifier, _ty :: RuntimeType, _info :: Position }
+    | Ref         { _ref :: Reference, _ty :: RuntimeType, _info :: Position }
+    | SymbolicRef { _var :: Identifier, _ty :: RuntimeType, _info :: Position }
+    | IteE        { _guard :: Expression, _true :: Expression, _false :: Expression, _ty :: RuntimeType, _info :: Position }
     deriving (Show)
 
 instance Eq Expression where
@@ -247,13 +247,13 @@ data UnOp
 instance Hashable UnOp
 
 data Lit
-    = BoolLit   { _boolValue   :: Bool     , _info :: SourcePos }
-    | UIntLit   { _uintValue   :: Int      , _info :: SourcePos }
-    | IntLit    { _intValue    :: Int      , _info :: SourcePos }
-    | FloatLit  { _floatValue  :: Float    , _info :: SourcePos }
-    | StringLit { _stringValue :: String   , _info :: SourcePos }
-    | CharLit   { _charValue   :: String   , _info :: SourcePos }
-    | NullLit   { _info        :: SourcePos                     }
+    = BoolLit   { _boolValue   :: Bool     , _info :: Position }
+    | UIntLit   { _uintValue   :: Int      , _info :: Position }
+    | IntLit    { _intValue    :: Int      , _info :: Position }
+    | FloatLit  { _floatValue  :: Float    , _info :: Position }
+    | StringLit { _stringValue :: String   , _info :: Position }
+    | CharLit   { _charValue   :: String   , _info :: Position }
+    | NullLit   { _info        :: Position                     }
     deriving (Show)
 
 instance Eq Lit where
@@ -293,18 +293,18 @@ instance WithPos Lit where
 --------------------------------------------------------------------------------
 
 data Type
-    = Type { _ty :: Maybe NonVoidType, _info :: SourcePos }
+    = Type { _ty :: Maybe NonVoidType, _info :: Position }
     deriving (Show, Eq)
 
 data NonVoidType
-    = UIntType      { _info :: SourcePos }
-    | IntType       { _info :: SourcePos }
-    | FloatType     { _info :: SourcePos }
-    | BoolType      { _info :: SourcePos }
-    | StringType    { _info :: SourcePos }
-    | CharType      { _info :: SourcePos }
-    | ReferenceType { _ty :: Identifier, _info :: SourcePos }
-    | ArrayType     { _innerTy :: NonVoidType, _info :: SourcePos }
+    = UIntType      { _info :: Position }
+    | IntType       { _info :: Position }
+    | FloatType     { _info :: Position }
+    | BoolType      { _info :: Position }
+    | StringType    { _info :: Position }
+    | CharType      { _info :: Position }
+    | ReferenceType { _ty :: Identifier, _info :: Position }
+    | ArrayType     { _innerTy :: NonVoidType, _info :: Position }
     deriving (Show, Eq)
 
 data RuntimeType
@@ -329,7 +329,7 @@ data RuntimeType
 --------------------------------------------------------------------------------
 
 data Identifier
-    = Identifier { _name :: String, _info :: SourcePos }
+    = Identifier { _name :: String, _info :: Position }
     deriving (Show)
 
 instance Eq Identifier where
