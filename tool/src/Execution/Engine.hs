@@ -163,10 +163,10 @@ execT thread@Thread{_pc=(_, _, ExceptionalNode, _)}
             else execT =<< popStackFrame thread
 
 -- A Method Call
-execT thread0@Thread{_pc=(_, _, CallNode entry method@Method{} variable arguments lhs, [(_, neighbour)])} = do
+execT thread0@Thread{_pc=(_, _, CallNode entry method@Method{} thisInfo arguments lhs, [(_, neighbour)])} = do
     -- Construct the parameters and arguments.
-    let parameters = method ^?! SL.params
-    arguments' <- maybe (return []) (fmap (:[]) . readVar thread0) variable >>= (return . (++arguments))
+    let parameters = [Parameter (fst (fromJust thisInfo)) this' unknownPos | isJust thisInfo] ++ method ^?! SL.params
+    let arguments' = [var' (snd (fromJust thisInfo)) (typeOf (fst (fromJust thisInfo))) | isJust thisInfo] ++ arguments
     -- Push a new stack frame and continue the execution.
     thread1 <- pushStackFrame thread0 thread0 neighbour method lhs (zip parameters arguments')
     step thread1 ((), entry)

@@ -62,7 +62,7 @@ data CFGNodeValue
     | CallNode 
         Node
         DeclarationMember
-        (Maybe Identifier)
+        (Maybe (NonVoidType, Identifier))
         [Expression]
         (Maybe Lhs)
     | ForkNode

@@ -66,7 +66,7 @@ instance WithPos DeclarationMember where
 
 data Parameter
     = Parameter { _ty :: NonVoidType, _name :: Identifier, _info :: Position }
-    deriving (Show)
+    deriving (Eq, Show)
 
 data Specification
     = Specification { _requires    :: Maybe Expression

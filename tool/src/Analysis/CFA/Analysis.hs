@@ -10,7 +10,9 @@ import           Control.Lens
 import           Control.Lens.Extras
 import           Data.Graph.Inductive.Graph      (insEdge, insNode)
 import           Data.Error
+import           Data.Positioned
 import           Syntax.Syntax
+import           Syntax.DSL
 import qualified Syntax.Lenses              as SL
 import           Analysis.Type.Typeable
 import           Analysis.CFA.CFG
@@ -199,14 +201,17 @@ toCatchExitNode s = (s ^?! SL.label4, CatchExit)
 
 toCallNode :: Maybe Lhs -> Invocation -> CFGNode
 toCallNode lhs invocation 
-    = (invocation ^. SL.label, CallNode memberEntry member variable arguments lhs)
+    = (invocation ^. SL.label, CallNode memberEntry member thisParam arguments lhs)
     where
         arguments   = invocation ^. SL.arguments
+        className   = invocation ^. SL.resolved ^?! _Just ^. _1 ^. SL.name
         member      = invocation ^. SL.resolved ^?! _Just ^. _2
         memberEntry = member ^?! SL.labels ^. _1
-        variable    
-            | Just False <- member ^? SL.isStatic = Just (invocation ^?! SL.lhs)
-            | otherwise                           = Nothing
+        thisParam    
+            | Just False <- member ^? SL.isStatic 
+                = Just (refType' className, invocation ^?! SL.lhs)
+            | otherwise                           
+                = Nothing
 
 initInvocationFork :: Invocation -> CFGNode
 initInvocationFork = toForkNode
