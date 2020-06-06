@@ -1,5 +1,3 @@
-{-# LANGUAGE ScopedTypeVariables, TypeOperators #-}
-
 module Execution.ExecutionState where
     
 import qualified Data.Map                 as M
@@ -10,7 +8,7 @@ import           Control.Lens
 import           Control.Monad
 import           Control.Monad.Extra
 import           Polysemy              
-import           Polysemy.Internal.Combinators
+import           Polysemy.LocalState
 import           Polysemy.Reader
 import           Polysemy.Error 
 import           Polysemy.State
@@ -76,25 +74,6 @@ type EvaluationResult a = Either Expression a
 --------------------------------------------------------------------------------
 -- Effect utilities
 --------------------------------------------------------------------------------
-
-data LocalState s m a where
-    PutLocal :: s -> LocalState s m ()
-    GetLocal :: LocalState s m s
-
-makeSem ''LocalState
-
-modifyLocal :: Member (LocalState s) r => (s -> s) -> Sem r ()
-modifyLocal f = do
-    s <- getLocal
-    putLocal $! f s
-
-runLocalState :: s -> Sem (LocalState s ': r) a -> Sem r (s, a)
-runLocalState = stateful $ \case
-    GetLocal   -> \ s -> pure (s, s)
-    PutLocal s -> const $ pure (s, ())
-
-evalLocalState :: s -> Sem (LocalState s ': r) a -> Sem r a
-evalLocalState s = fmap snd . runLocalState s
 
 branch :: Foldable t => (a -> Engine r b) -> t a -> Engine r [b]
 branch f options = do

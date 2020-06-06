@@ -12,7 +12,8 @@ import           Data.Graph.Inductive.Graph         (Node, context)
 import           Polysemy              
 import           Polysemy.Reader
 import           Polysemy.Cache hiding (Store, Contains)
-import           Polysemy.Error hiding (Throw)
+import           Polysemy.Error hiding (Throw)              
+import           Polysemy.LocalState
 import           Polysemy.State
 import           Control.Monad hiding (guard)
 import           Control.Monad.Extra

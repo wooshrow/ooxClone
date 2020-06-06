@@ -6,7 +6,8 @@ import           Data.Maybe
 import           Control.Lens hiding (index, indices)
 import           Control.Monad
 import           Polysemy.Reader
-import           Polysemy.Error
+import           Polysemy.Error              
+import           Polysemy.LocalState
 import           Text.Pretty
 import           Execution.ExecutionState
 import           Execution.Memory.AliasMap

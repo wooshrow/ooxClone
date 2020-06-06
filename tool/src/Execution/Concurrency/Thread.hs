@@ -7,7 +7,8 @@ import           Polysemy
 import           Polysemy.State
 import           Polysemy.Reader
 import           Polysemy.Error
-import           Polysemy.Cache
+import           Polysemy.Cache              
+import           Polysemy.LocalState
 import           Control.Lens hiding (index, indices, element, children)
 import           Control.Monad
 import           Data.Graph.Inductive.Graph (Node, context)

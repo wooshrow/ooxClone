@@ -1,4 +1,5 @@
 {-# LANGUAGE LiberalTypeSynonyms #-}
+
 module Execution.Evaluation(
       evaluateAsInt
     , evaluateAsBool
@@ -9,7 +10,8 @@ import Polysemy
 import Polysemy.State
 import Polysemy.Reader
 import Polysemy.Error
-import Polysemy.Cache
+import Polysemy.Cache              
+import Polysemy.LocalState
 import Data.Configuration
 import Data.Statistics
 import Verification.Result

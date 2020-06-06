@@ -2,7 +2,8 @@ module Execution.Memory.AliasMap where
 
 import qualified Data.Map                 as M
 import qualified Data.Set                 as S
-import           Data.Maybe
+import           Data.Maybe              
+import           Polysemy.LocalState
 import           Control.Lens
 import           Execution.ExecutionState
 import           Data.Configuration

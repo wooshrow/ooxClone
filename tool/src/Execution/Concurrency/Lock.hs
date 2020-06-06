@@ -1,7 +1,8 @@
 module Execution.Concurrency.Lock where
 
 import qualified Data.Map                 as M
-import           Control.Lens
+import           Control.Lens              
+import           Polysemy.LocalState
 import           Execution.ExecutionState
 import           Language.Syntax
 
