@@ -3,9 +3,9 @@ module Analysis.Type.Typeable where
 import           Control.Lens
 import           Data.Positioned
 import           Text.Pretty
-import           Syntax.Syntax
-import           Syntax.Pretty()
-import qualified Syntax.Lenses   as SL
+import           Language.Syntax
+import           Language.Syntax.Pretty()
+import qualified Language.Syntax.Lenses   as SL
 
 class Typeable a where
     typeOf :: a -> RuntimeType

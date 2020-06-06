@@ -1,6 +1,6 @@
-module Syntax.DSL where
+module Language.Syntax.DSL where
 
-import Syntax.Syntax
+import Language.Syntax
 import Analysis.Type.Typeable
 import Data.Positioned
 
@@ -52,8 +52,8 @@ ref' ref ty = Ref ref ty unknownPos
 symbolicRef' :: Identifier -> RuntimeType -> Expression
 symbolicRef' var ty = SymbolicRef var ty unknownPos
 
-iteE' :: Expression -> Expression -> Expression -> Expression
-iteE' guard true false = IteE guard true false BoolRuntimeType unknownPos
+conditional' :: Expression -> Expression -> Expression -> Expression
+conditional' guard true false = Conditional guard true false BoolRuntimeType unknownPos
 
 --------------------------------------------------------------------------------
 -- Binary Operators

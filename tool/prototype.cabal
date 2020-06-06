@@ -12,11 +12,11 @@ extra-source-files:     CHANGELOG.md
 
 executable app
   -- other-extensions:
-    other-modules:          Syntax.Syntax
-                          , Syntax.Lenses
-                          , Syntax.Fold
-                          , Syntax.DSL
-                          , Syntax.Pretty
+    other-modules:          Language.Syntax
+                          , Language.Syntax.Lenses
+                          , Language.Syntax.Fold
+                          , Language.Syntax.DSL
+                          , Language.Syntax.Pretty
                           , Parsing.Lexer
                           , Parsing.Parser
                           , Parsing.Labeling

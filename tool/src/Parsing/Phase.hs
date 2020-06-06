@@ -10,7 +10,7 @@ import Data.Configuration
 import Parsing.Lexer
 import Parsing.Parser
 import Parsing.Labeling
-import Syntax.Syntax      (CompilationUnit)
+import Language.Syntax    (CompilationUnit)
 import Text.Pretty
 
 parsingPhase :: Members [Reader Configuration, Error ErrorMessage, Embed IO] r 

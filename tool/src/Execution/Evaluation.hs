@@ -19,9 +19,9 @@ import Execution.Concurrency.Thread
 import Execution.ExecutionState
 import Execution.Memory.Heap
 import Data.Positioned
-import Syntax.Syntax
-import Syntax.Fold
-import Syntax.DSL
+import Language.Syntax
+import Language.Syntax.Fold
+import Language.Syntax.DSL
 
 evaluateAsInt :: Thread -> Expression -> Engine r (EvaluationResult Int)
 evaluateAsInt thread expression = do
@@ -85,7 +85,7 @@ evaluate thread0 expression = foldExpression algebra expression thread0
                 initializeSymbolicRef expr
                 return expr
                 
-            , fIte = \ guard0 true0 false0 ty pos thread -> do
+            , fCond = \ guard0 true0 false0 ty pos thread -> do
                 guard1 <- guard0 thread
                 case guard1 of
                     (Lit (BoolLit True  _) _ _) -> true0 thread
@@ -93,7 +93,7 @@ evaluate thread0 expression = foldExpression algebra expression thread0
                     _                           -> do
                         true1  <- true0 thread
                         false1 <- false0 thread
-                        return $ IteE guard1 true1 false1 ty pos }
+                        return $ Conditional guard1 true1 false1 ty pos }
 
 evaluateQuantifier :: ([Expression] -> Expression) -> Identifier -> Identifier -> Identifier -> (Thread -> Engine r Expression) -> RuntimeType -> Position -> Thread -> Engine r Expression
 evaluateQuantifier quantifier elem range domain formula0 _ _ thread0 = do

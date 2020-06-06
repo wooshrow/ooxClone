@@ -22,10 +22,10 @@ import           Verification.Result
 import           Analysis.CFA.CFG
 import           Analysis.Type.Typeable
 import           Execution.Memory.AliasMap
-import           Syntax.Syntax
-import           Syntax.Fold
-import qualified Syntax.Lenses              as SL
-import           Syntax.Pretty()
+import           Language.Syntax
+import           Language.Syntax.Fold
+import qualified Language.Syntax.Lenses    as SL
+import           Language.Syntax.Pretty()
 
 --------------------------------------------------------------------------------
 -- Verification Interface
@@ -113,7 +113,7 @@ construct e@Lit{} =
 
 construct e@Ref{} = mkIntNum (e ^?! SL.ref)
 
-construct e@IteE{} = do
+construct e@Conditional{} = do
     guard <- construct (e ^?! SL.guard)
     true  <- construct (e ^?! SL.true)
     false <- construct (e ^?! SL.false)

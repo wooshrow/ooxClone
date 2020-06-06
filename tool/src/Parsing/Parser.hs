@@ -1,15 +1,15 @@
 module Parsing.Parser where
 
-import           Control.Monad     (when)
-import           Text.Parsec       hiding (getPosition, Empty)
-import qualified Text.Parsec       as P (getPosition)
-import qualified Text.Parsec.Pos   as P (SourcePos, newPos)
-import           Text.Parsec.Error
-import qualified Data.Set          as S
+import           Control.Monad       (when)
+import           Text.Parsec         hiding (getPosition, Empty)
+import qualified Text.Parsec         as P (getPosition)
+import qualified Text.Parsec.Pos     as P (SourcePos, newPos)
+import           Text.Parsec.Error  
+import qualified Data.Set            as S
 import           Text.Pretty
 import           Parsing.Lexer
-import           Syntax.Syntax
-import           Syntax.DSL
+import           Language.Syntax
+import           Language.Syntax.DSL
 import           Data.Positioned
 import           Data.Error
 
@@ -639,7 +639,7 @@ exceptionalExpression exp
                 SizeOf{_var}    -> S.singleton (var' _var ARRAYRuntimeType `equal'` lit' nullLit')
                 Ref{}           -> S.empty
                 SymbolicRef{}   -> S.empty
-                IteE{..}        -> exceptional' _guard `S.union` exceptional' _true `S.union` exceptional' _false
+                Conditional{..} -> exceptional' _guard `S.union` exceptional' _true `S.union` exceptional' _false
 
 --------------------------------------------------------------------------------
 -- Statement Creation

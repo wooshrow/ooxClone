@@ -1,4 +1,4 @@
-module Syntax.Fold(
+module Language.Syntax.Fold(
       StatementAlgebra
     , foldStatement
     , ExpressionAlgebra(..)
@@ -9,7 +9,7 @@ module Syntax.Fold(
 ) where
 
 import Data.Positioned
-import Syntax.Syntax
+import Language.Syntax
 
 type StatementAlgebra r
     = ( NonVoidType -> Identifier -> Label -> Position -> r         -- Declaration
@@ -68,7 +68,7 @@ data ExpressionAlgebra r
     , fSizeOf :: Identifier -> RuntimeType -> Position -> r
     , fRef    :: Int -> RuntimeType -> Position -> r
     , fSymRef :: Identifier -> RuntimeType -> Position -> r
-    , fIte    :: r -> r -> r -> RuntimeType -> Position -> r }
+    , fCond   :: r -> r -> r -> RuntimeType -> Position -> r }
     
 monoidExpressionAlgebra :: Monoid r => ExpressionAlgebra r
 monoidExpressionAlgebra = ExpressionAlgebra
@@ -82,7 +82,7 @@ monoidExpressionAlgebra = ExpressionAlgebra
     , fSizeOf = \ _ _ _                -> mempty
     , fRef    = \ _ _ _                -> mempty
     , fSymRef = \ _ _ _                -> mempty
-    , fIte    = \ guard true false _ _ -> guard <> true <> false }
+    , fCond   = \ guard true false _ _ -> guard <> true <> false }
 
 monoidMExpressionAlgebra :: (Monoid r, Monad m) => ExpressionAlgebra (m r)
 monoidMExpressionAlgebra = ExpressionAlgebra
@@ -96,7 +96,7 @@ monoidMExpressionAlgebra = ExpressionAlgebra
     , fSizeOf = \ _ _ _                -> return mempty
     , fRef    = \ _ _ _                -> return mempty
     , fSymRef = \ _ _ _                -> return mempty
-    , fIte    = \ guard true false _ _ -> (\ g t f -> g <> t <> f) <$> guard <*> true <*> false }
+    , fCond   = \ guard true false _ _ -> (\ g t f -> g <> t <> f) <$> guard <*> true <*> false }
 
 identityExpressionAlgebra :: ExpressionAlgebra Expression
 identityExpressionAlgebra = ExpressionAlgebra
@@ -110,7 +110,7 @@ identityExpressionAlgebra = ExpressionAlgebra
     , fSizeOf = SizeOf
     , fRef    = Ref
     , fSymRef = SymbolicRef
-    , fIte    = IteE }
+    , fCond   = Conditional }
 
 foldExpression :: ExpressionAlgebra r -> Expression -> r
 foldExpression ExpressionAlgebra{..} = fold
@@ -125,35 +125,4 @@ foldExpression ExpressionAlgebra{..} = fold
         fold SizeOf{..}      = fSizeOf _var _ty _info
         fold Ref{..}         = fRef _ref _ty _info
         fold SymbolicRef{..} = fSymRef _var _ty _info
-        fold IteE{..}        = fIte (fold _guard) (fold _true) (fold _false) _ty _info
-
-{-type ExpressionAlgebra r
-    = ( Identifier -> Identifier -> Identifier -> r -> RuntimeType -> SourcePos -> r -- Forall
-      , Identifier -> Identifier -> Identifier -> r -> RuntimeType -> SourcePos -> r -- Exists
-      , BinOp -> r -> r -> RuntimeType -> SourcePos -> r                             -- BinOp
-      , UnOp -> r -> RuntimeType -> SourcePos -> r                                   -- UnOp
-      , Identifier -> RuntimeType -> SourcePos -> r                                  -- Var
-      , Identifier -> RuntimeType -> SourcePos -> r                                  -- SymbolicVar
-      , Lit -> RuntimeType -> SourcePos -> r                                         -- Lit
-      , Identifier -> RuntimeType -> SourcePos -> r                                  -- SizeOf
-      , Int -> RuntimeType -> SourcePos -> r                                         -- Ref
-      , Identifier -> RuntimeType -> SourcePos -> r                                  -- SymbolicRef
-      , r -> r -> r -> RuntimeType -> SourcePos -> r)                                -- Ite
-
-
-foldExpression :: ExpressionAlgebra r -> Expression -> r
-foldExpression (fForall, fExists, fBinOp, fUnOp, fVar, fSymbolicVar, fLit, fSizeOf, fRef, fSymbolicRef, fIte)
-    = fold
-    where
-        fold Forall{..}      = fForall _elem _range _domain (fold _formula) _ty _info
-        fold Exists{..}      = fExists _elem _range _domain (fold _formula) _ty _info
-        fold BinOp{..}       = fBinOp _binOp (fold _lhs) (fold _rhs) _ty _info
-        fold UnOp{..}        = fUnOp _unOp (fold _value) _ty _info
-        fold Var{..}         = fVar _var _ty _info
-        fold SymbolicVar{..} = fSymbolicVar _var _ty _info
-        fold Lit{..}         = fLit _lit _ty _info
-        fold SizeOf{..}      = fSizeOf _var _ty _info
-        fold Ref{..}         = fRef _ref _ty _info
-        fold SymbolicRef{..} = fSymbolicRef _var _ty _info
-        fold IteE{..}        = fIte (fold _guard) (fold _true) (fold _false) _ty _info
--}
+        fold Conditional{..} = fCond (fold _guard) (fold _true) (fold _false) _ty _info

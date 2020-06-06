@@ -21,10 +21,10 @@ import           Data.Configuration
 import           Data.Error
 import           Data.Statistics
 import           Data.Positioned
-import           Syntax.Syntax
-import           Syntax.Fold
-import           Syntax.DSL
-import qualified Syntax.Lenses               as SL
+import           Language.Syntax
+import           Language.Syntax.Fold
+import           Language.Syntax.DSL
+import qualified Language.Syntax.Lenses       as SL
 import           Text.Pretty
 import           Analysis.CFA.CFG
 import           Analysis.SymbolTable
@@ -402,7 +402,7 @@ execRhs thread rhs@RhsField{} continueF = do
         Ref{}             -> readField (ref ^?! SL.ref) field >>= continueF
         SymbolicRef{}     -> initializeSymbolicRef ref >> readSymbolicField ref field >>= continueF
         Lit NullLit{} _ _ -> infeasible
-        IteE{}            -> processRhsFieldIte field ref >>= continueF
+        Conditional{}     -> processRhsFieldCond field ref >>= continueF
 
 execRhs thread rhs@RhsElem{} continueF = do
     ref <- readVar thread (rhs ^?! SL.var ^?! SL.var)
@@ -419,16 +419,16 @@ execRhs thread rhs@RhsArray{} continueF = do
     value <- createArray sizes (typeOf rhs)
     continueF value
 
-processRhsFieldIte :: Identifier -> Expression -> Engine r Expression
-processRhsFieldIte field (IteE guard true false ty info) = do
-    true'  <- processRhsFieldIte field true
-    false' <- processRhsFieldIte field false
-    return $ IteE guard true' false' ty info
-processRhsFieldIte _ (Lit NullLit{} _ _) 
+processRhsFieldCond :: Identifier -> Expression -> Engine r Expression
+processRhsFieldCond field (Conditional guard true false ty info) = do
+    true'  <- processRhsFieldCond field true
+    false' <- processRhsFieldCond field false
+    return $ Conditional guard true' false' ty info
+processRhsFieldCond _ (Lit NullLit{} _ _) 
     = infeasible
-processRhsFieldIte field (Ref ref _ _) 
+processRhsFieldCond field (Ref ref _ _) 
     = readField ref field
-processRhsFieldIte field ref@SymbolicRef{}
+processRhsFieldCond field ref@SymbolicRef{}
     = readSymbolicField ref field
 
 --------------------------------------------------------------------------------

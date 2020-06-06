@@ -1,10 +1,10 @@
 {-# OPTIONS_GHC -fno-warn-orphans #-}
 
-module Syntax.Pretty where
+module Language.Syntax.Pretty where
 
 import Prelude            hiding ((<>))
 import Text.Pretty
-import Syntax.Syntax
+import Language.Syntax
 
 --------------------------------------------------------------------------------
 -- Top-level pretty printing
@@ -174,7 +174,7 @@ instance Pretty Expression where
         = text "ref" <> parens (pretty _ref)
     pretty SymbolicRef{..}
         = pretty _var
-    pretty IteE{..}
+    pretty Conditional{..}
         = text "ite" <> parens (pretty _guard <> comma <> pretty _true <> comma <> pretty _false)
 
 instance Pretty BinOp where

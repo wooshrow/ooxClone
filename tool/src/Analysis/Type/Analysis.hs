@@ -12,10 +12,10 @@ import           Data.Maybe                  (fromJust)
 import           Control.Lens
 import           Control.Lens.Extras
 import           Text.Pretty
-import           Syntax.Syntax
-import           Syntax.Fold
-import           Syntax.DSL
-import qualified Syntax.Lenses          as SL
+import           Language.Syntax
+import           Language.Syntax.Fold
+import           Language.Syntax.DSL
+import qualified Language.Syntax.Lenses as SL
 import           Analysis.SymbolTable
 import           Analysis.Type.Typeable
 import           Data.Error
@@ -337,7 +337,7 @@ expressionAlgebra = ExpressionAlgebra
     
     , fSymRef = error "Symbolic reference in analysis phase"
 
-    , fIte = error "Ite in analysis phase" }
+    , fCond = error "Ite in analysis phase" }
 
 typeBinOp :: BinOp -> Expression -> Expression -> TypingEffects r RuntimeType
 typeBinOp op exp1 exp2

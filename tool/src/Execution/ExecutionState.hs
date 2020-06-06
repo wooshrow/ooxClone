@@ -26,8 +26,8 @@ import           Analysis.CFA.CFG
 import           Analysis.SymbolTable
 import           Analysis.Type.Typeable
 import           Verification.Result
-import           Syntax.Syntax
-import           Syntax.DSL
+import           Language.Syntax
+import           Language.Syntax.DSL
 
 data ExecutionState = ExecutionState
     { _threads                 :: S.Set Thread

@@ -3,8 +3,8 @@ module Verification.Result where
 import Prelude hiding ((<>))
 import Text.Pretty
 import Data.Positioned
-import Syntax.Syntax
-import Syntax.Pretty()
+import Language.Syntax
+import Language.Syntax.Pretty()
 import Analysis.CFA.CFG
 
 data VerificationResult

@@ -1,6 +1,6 @@
 module Execution.Memory.Heap where
-    import qualified Data.Map      as M
-    import           Syntax.Syntax
+    import qualified Data.Map        as M
+    import           Language.Syntax
 
     data HeapValue 
         = ObjectValue (M.Map Identifier Expression) RuntimeType

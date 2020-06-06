@@ -16,14 +16,14 @@ module Analysis.SymbolTable (
     , getAllFields
 ) where
 
-import qualified Data.Map               as M
-import qualified Data.Set               as S
-import           Data.List                    (elemIndex)
+import qualified Data.Map                 as M
+import qualified Data.Set                 as S
+import           Data.List                     (elemIndex)
 import           Data.Positioned
 import           Control.Lens.Extras
-import           Syntax.Syntax
-import           Syntax.Pretty()
-import qualified Syntax.Lenses          as SL
+import           Language.Syntax
+import           Language.Syntax.Pretty()
+import qualified Language.Syntax.Lenses   as SL
 import           Analysis.Type.Typeable
 
 newtype SymbolTable 

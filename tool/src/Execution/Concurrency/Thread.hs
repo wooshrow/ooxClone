@@ -21,11 +21,11 @@ import           Execution.Concurrency.Lock
 import           Analysis.CFA.CFG
 import           Analysis.SymbolTable
 import           Verification.Result
-import           Syntax.Syntax
-import           Syntax.Fold
-import           Syntax.DSL
-import qualified Syntax.Lenses as SL
-import           Syntax.Pretty()
+import           Language.Syntax
+import           Language.Syntax.Fold
+import           Language.Syntax.DSL
+import qualified Language.Syntax.Lenses as SL
+import           Language.Syntax.Pretty()
 
 data Thread = Thread 
     { _tid          :: Int
@@ -121,11 +121,11 @@ substitute thread0 expression = foldExpression substitutionAlgebra expression th
                 initializeSymbolicRef ref
                 return ref
                 
-            , fIte = \ guard0 true0 false0 ty pos thread -> do
+            , fCond = \ guard0 true0 false0 ty pos thread -> do
                 guard1 <- guard0 thread
                 true1  <- true0 thread
                 false1 <- false0 thread
-                return (IteE guard1 true1 false1 ty pos) }
+                return (Conditional guard1 true1 false1 ty pos) }
 
 substituteQuantifier :: ([Expression] -> Expression) -> Identifier -> Identifier -> Identifier -> (Thread -> Engine r Expression) -> RuntimeType -> Position -> Thread -> Engine r Expression
 substituteQuantifier quantifier elem range domain formula _ _ thread0 = do

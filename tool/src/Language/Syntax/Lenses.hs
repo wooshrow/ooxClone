@@ -1,7 +1,7 @@
-module Syntax.Lenses where
+module Language.Syntax.Lenses where
 
 import Control.Lens
-import Syntax.Syntax
+import Language.Syntax
 
 -- $(makeFieldsNoPrefix ''Label)
 $(makeFieldsNoPrefix ''Identifier)

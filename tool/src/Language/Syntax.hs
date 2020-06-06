@@ -1,6 +1,6 @@
 {-# LANGUAGE DeriveGeneric #-}
 
-module Syntax.Syntax(
+module Language.Syntax(
       CompilationUnit(..)
     , Declaration(..)
     , DeclarationMember(..)
@@ -152,7 +152,7 @@ data Expression
     | SizeOf      { _var :: Identifier, _ty :: RuntimeType, _info :: Position }
     | Ref         { _ref :: Reference, _ty :: RuntimeType, _info :: Position }
     | SymbolicRef { _var :: Identifier, _ty :: RuntimeType, _info :: Position }
-    | IteE        { _guard :: Expression, _true :: Expression, _false :: Expression, _ty :: RuntimeType, _info :: Position }
+    | Conditional { _guard :: Expression, _true :: Expression, _false :: Expression, _ty :: RuntimeType, _info :: Position }
     deriving (Show)
 
 instance Eq Expression where
@@ -176,7 +176,7 @@ instance Eq Expression where
         = refA == refB
     (SymbolicRef varA _ _) == (SymbolicRef varB _ _)
         = varA == varB
-    (IteE guardA trueA falseA _ _) == (IteE guardB trueB falseB _ _)
+    (Conditional guardA trueA falseA _ _) == (Conditional guardB trueB falseB _ _)
         = guardA == guardB && trueA == trueB && falseA == falseB
     _ == _ = False
 
@@ -201,7 +201,7 @@ instance Ord Expression where
         = refA <= refB
     (SymbolicRef varA _ _) <= (SymbolicRef varB _ _)
         = varA <= varB
-    (IteE guardA trueA falseA _ _) <= (IteE guardB trueB falseB _ _)
+    (Conditional guardA trueA falseA _ _) <= (Conditional guardB trueB falseB _ _)
         = guardA <= guardB && trueA <= trueB && falseA <= falseB
     _ <= _ = False
 
@@ -226,8 +226,8 @@ instance Hashable Expression where
         = hashWithSalt salt ref `hashWithSalt` (9 :: Int)
     hashWithSalt salt (SymbolicRef var _ _)
         = hashWithSalt salt var `hashWithSalt` (10 :: Int)
-    hashWithSalt salt (IteE guard true false _ _)
-        = salt `hashWithSalt` guard `hashWithSalt` true `hashWithSalt` false `hashWithSalt` (111 :: Int)
+    hashWithSalt salt (Conditional guard true false _ _)
+        = salt `hashWithSalt` guard `hashWithSalt` true `hashWithSalt` false `hashWithSalt` (11 :: Int)
 
 instance WithPos Expression where
     getPos = _info

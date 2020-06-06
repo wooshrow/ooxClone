@@ -12,10 +12,10 @@ import           Execution.Memory.AliasMap
 import           Analysis.SymbolTable
 import           Data.Positioned
 import           Data.Configuration
-import           Syntax.Syntax
-import           Syntax.DSL
-import           Syntax.Pretty()
-import qualified Syntax.Lenses            as SL
+import           Language.Syntax
+import           Language.Syntax.DSL
+import           Language.Syntax.Pretty()
+import qualified Language.Syntax.Lenses    as SL
 import           Analysis.Type.Typeable
 
 --------------------------------------------------------------------------------
@@ -77,7 +77,7 @@ readSymbolicField :: Expression -> Identifier -> Engine r Expression
 readSymbolicField var@(SymbolicRef symRef _ _) field = do
     concretes <- fromJust <$> getAliasesWithoutNull symRef
     values <- mapM ( \ concRef@(Ref ref _ _) -> (concRef, ) <$> readField ref field) (S.toList concretes)
-    return $ foldr (\ (concRef, value) -> iteE' (var `equal'` concRef) value) (head values ^. _2) (tail values)
+    return $ foldr (\ (concRef, value) -> conditional' (var `equal'` concRef) value) (head values ^. _2) (tail values)
 
 --------------------------------------------------------------------------------
 -- Field Writing
@@ -92,7 +92,7 @@ writeField ref field value = do
 writeSymbolicField :: Expression -> Expression -> Identifier -> Expression -> Engine r ()
 writeSymbolicField symRef concRef@(Ref ref _ _) field value = do
     oldValue <- readField ref field
-    writeField ref field (iteE' (symRef `equal'` concRef) value oldValue)
+    writeField ref field (conditional' (symRef `equal'` concRef) value oldValue)
 writeSymbolicField _ (Lit NullLit{} _ _) _ _ = infeasible
 
 --------------------------------------------------------------------------------
@@ -126,7 +126,7 @@ writeIndexSymbolic ref symIndex value = do
     structure <- dereference ref
     let (ArrayValue values) = structure
     let indices = map (lit' . intLit') [0..]
-    let newStructure = ArrayValue $ map (\ (oldValue, concIndex) -> iteE' (symIndex `equal'` concIndex) value oldValue) (zip values indices)
+    let newStructure = ArrayValue $ map (\ (oldValue, concIndex) -> conditional' (symIndex `equal'` concIndex) value oldValue) (zip values indices)
     modifyLocal (\ state -> state & (heap %~ M.insert ref newStructure))
 
 --------------------------------------------------------------------------------
@@ -152,7 +152,7 @@ readIndexSymbolic ref symIndex = do
     structure <- dereference ref
     let (ArrayValue values) = structure
     let indices = map (lit' . intLit') [1..]
-    let value = foldr (\ (value, concIndex) -> iteE' (symIndex `equal'` concIndex) value) (values ^?! _head) (zip (values ^?! _tail) indices)
+    let value = foldr (\ (value, concIndex) -> conditional' (symIndex `equal'` concIndex) value) (values ^?! _head) (zip (values ^?! _tail) indices)
     return value
 
 --------------------------------------------------------------------------------

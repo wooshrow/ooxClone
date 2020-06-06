@@ -15,7 +15,7 @@ import           Analysis.SymbolTable
 import           Analysis.Type.Analysis
 import           Analysis.CFA.Analysis
 import           Analysis.CFA.CFG
-import           Syntax.Syntax
+import           Language.Syntax
 
 analysisPhase :: Members [Reader Configuration, Error ErrorMessage, Embed IO] r 
     => CompilationUnit -> Sem r (SymbolTable, ControlFlowGraph)

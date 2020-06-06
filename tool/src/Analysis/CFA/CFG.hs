@@ -16,9 +16,9 @@ import           Control.Lens                      hiding ((&))
 import qualified Data.Set                          as S
 import qualified Text.Pretty                       as P
 import           Analysis.Type.Typeable
-import           Syntax.Syntax
-import qualified Syntax.Lenses                     as SL
-import           Syntax.Pretty()
+import           Language.Syntax
+import qualified Language.Syntax.Lenses            as SL
+import           Language.Syntax.Pretty()
 
 type ControlFlowGraph = ControlFlowGraph' CFGNodeValue ()
 

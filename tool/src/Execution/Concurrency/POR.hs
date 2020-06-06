@@ -11,9 +11,9 @@ import           Execution.ExecutionState
 import           Execution.Memory.AliasMap
 import           Analysis.CFA.CFG
 import           Text.Pretty
-import           Syntax.Syntax
-import qualified Syntax.Lenses                 as SL
-import           Syntax.Fold
+import           Language.Syntax
+import qualified Language.Syntax.Lenses       as SL
+import           Language.Syntax.Fold
 
 type InterleavingConstraints = [InterleavingConstraint]
 

@@ -11,9 +11,9 @@ import           Control.Lens.Extras
 import           Data.Graph.Inductive.Graph      (insEdge, insNode)
 import           Data.Error
 import           Data.Positioned
-import           Syntax.Syntax
-import           Syntax.DSL
-import qualified Syntax.Lenses              as SL
+import           Language.Syntax
+import           Language.Syntax.DSL
+import qualified Language.Syntax.Lenses     as SL
 import           Analysis.Type.Typeable
 import           Analysis.CFA.CFG
 import           Analysis.SymbolTable

@@ -8,9 +8,9 @@ import           Execution.ExecutionState
 import           Data.Configuration
 import           Text.Pretty
 import           Analysis.Type.Typeable
-import           Syntax.Syntax
-import           Syntax.DSL
-import           Syntax.Pretty()
+import           Language.Syntax
+import           Language.Syntax.DSL
+import           Language.Syntax.Pretty()
 
 type AliasMap = M.Map Identifier (S.Set Expression)
 

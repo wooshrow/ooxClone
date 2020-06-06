@@ -3,11 +3,11 @@ module Data.Error where
 import           Prelude                   hiding ((<>))
 import           Data.List                        (intercalate)
 import           Control.Lens.Extras
-import qualified Syntax.Lenses       as SL
 import           Data.Positioned
 import           Text.Pretty
-import           Syntax.Syntax
-import           Syntax.Pretty()
+import           Language.Syntax
+import           Language.Syntax.Pretty()
+import qualified Language.Syntax.Lenses   as SL
 
 type Erroneous a = Either ErrorMessage a
 

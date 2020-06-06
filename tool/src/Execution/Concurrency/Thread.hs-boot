@@ -3,7 +3,7 @@ module Execution.Concurrency.Thread where
     import qualified Data.Stack                 as T
     import qualified Data.Map                   as M
     import           Analysis.CFA.CFG
-    import           Syntax.Syntax
+    import           Language.Syntax
     
     data Thread = Thread 
         { _tid          :: Int

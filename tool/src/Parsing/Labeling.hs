@@ -5,9 +5,9 @@ module Parsing.Labeling (
 import           Polysemy      
 import           Polysemy.State
 import           Control.Lens
-import           Syntax.Syntax
-import qualified Syntax.Lenses  as SL
-import           Syntax.Fold
+import           Language.Syntax
+import qualified Language.Syntax.Lenses as SL
+import           Language.Syntax.Fold
 
 labelize :: CompilationUnit -> Sem r CompilationUnit
 labelize = evalState 1 . labelizeCompilationUnit
