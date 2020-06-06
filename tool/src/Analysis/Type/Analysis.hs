@@ -4,17 +4,16 @@ import           Polysemy
 import           Polysemy.State
 import           Polysemy.Reader
 import           Polysemy.Error              (Error, throw)
-import           Control.Monad
+import           Control.Monad               (when, unless)
 import qualified Data.Map               as M
 import qualified Data.Set               as S
 import           Data.Foldable               (find)
 import           Data.Maybe                  (fromJust)
-import           Control.Lens
+import           Control.Lens                hiding (element, index)
 import           Control.Lens.Extras
 import           Text.Pretty
 import           Language.Syntax
 import           Language.Syntax.Fold
-import           Language.Syntax.DSL
 import qualified Language.Syntax.Lenses as SL
 import           Analysis.SymbolTable
 import           Analysis.Type.Typeable
@@ -159,7 +158,9 @@ statementAlgebra (_, currentMethod) =
                     Just expr'' ->
                         throw (unexpectedReturnValueError expr'')
                     Nothing -> do
-                        let thisVar = var' (Identifier "this" unknownPos) (typeOf currentMethod)
+                        let thisTy  = typeOf currentMethod
+                        let thisName = Identifier "this" unknownPos
+                        let thisVar = Var thisName thisTy unknownPos
                         return $ Return (Just thisVar) l pos
             else 
                 case expr' of
@@ -288,27 +289,27 @@ typeExpression = foldExpression expressionAlgebra
 
 expressionAlgebra :: Members [Reader SymbolTable, State TypeEnvironment, Error ErrorMessage] r => ExpressionAlgebra (Sem r Expression)
 expressionAlgebra = ExpressionAlgebra 
-    { fForall = \ elem range domain formula _ pos -> do
+    { fForall = \ element range domain formula _ pos -> do
         arrayTy <- getVarType readOfUndeclaredVarError domain
         matchType (Var domain arrayTy (getPos domain)) ARRAYRuntimeType
         let ArrayRuntimeType innerArrayTy = arrayTy
         formula' <- inNewScope (do
-            declareVar elem innerArrayTy
+            declareVar element innerArrayTy
             declareVar range IntRuntimeType
             formula)
         matchType formula' BoolRuntimeType
-        return $ Forall elem range domain formula' BoolRuntimeType pos
+        return $ Forall element range domain formula' BoolRuntimeType pos
 
-    , fExists = \ elem range domain formula _ pos -> do
+    , fExists = \ element range domain formula _ pos -> do
         arrayTy <- getVarType readOfUndeclaredVarError domain
         matchType (Var domain arrayTy (getPos domain)) ARRAYRuntimeType
         let ArrayRuntimeType innerArrayTy = arrayTy
         formula' <- inNewScope (do
-            declareVar elem innerArrayTy
+            declareVar element innerArrayTy
             declareVar range IntRuntimeType
             formula)
         matchType formula' BoolRuntimeType
-        return $ Exists elem range domain formula' BoolRuntimeType pos
+        return $ Exists element range domain formula' BoolRuntimeType pos
     
     , fBinOp = \ binOp lhs rhs _ pos -> do
         lhs' <- lhs
@@ -340,14 +341,14 @@ expressionAlgebra = ExpressionAlgebra
     , fCond = error "Ite in analysis phase" }
 
 typeBinOp :: BinOp -> Expression -> Expression -> TypingEffects r RuntimeType
-typeBinOp op exp1 exp2
-    | op `elem` [Implies, And, Or]
+typeBinOp binOp exp1 exp2
+    | binOp `elem` [Implies, And, Or]
         = matchType exp1 BoolRuntimeType >> matchType exp2 BoolRuntimeType >> return BoolRuntimeType
-    | op `elem` [Equal, NotEqual]
+    | binOp `elem` [Equal, NotEqual]
         = matchType exp2 exp1 >> return BoolRuntimeType
-    | op `elem` [LessThan, LessThanEqual, GreaterThan, GreaterThanEqual]
+    | binOp `elem` [LessThan, LessThanEqual, GreaterThan, GreaterThanEqual]
         = matchType exp1 NUMRuntimeType >> matchType exp2 NUMRuntimeType >> return BoolRuntimeType
-    | op `elem` [Plus, Minus, Multiply, Divide, Modulo]
+    | binOp `elem` [Plus, Minus, Multiply, Divide, Modulo]
         = matchType exp1 NUMRuntimeType >> matchType exp2 NUMRuntimeType >> return (typeOf exp1)
     | otherwise 
         = error "typeBinOp - missing case"

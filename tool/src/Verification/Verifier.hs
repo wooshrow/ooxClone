@@ -7,7 +7,7 @@ module Verification.Verifier(
 import qualified Data.Map                   as M
 import qualified Data.Set                   as S
 import           Data.Maybe
-import           Control.Monad
+import           Control.Monad (void)
 import           Polysemy
 import           Polysemy.Error
 import           Polysemy.State
@@ -20,7 +20,6 @@ import           Data.Statistics
 import           Data.Configuration
 import           Verification.Result
 import           Analysis.CFA.CFG
-import           Analysis.Type.Typeable
 import           Execution.Memory.AliasMap
 import           Language.Syntax
 import           Language.Syntax.Fold

@@ -6,11 +6,10 @@ import           Polysemy.Reader
 import           Polysemy.Error                  (Error, throw)
 import           Control.Monad
 import qualified Data.Set                   as S
-import           Control.Lens
+import           Control.Lens                    hiding (from, to)
 import           Control.Lens.Extras
 import           Data.Graph.Inductive.Graph      (insEdge, insNode)
 import           Data.Error
-import           Data.Positioned
 import           Language.Syntax
 import           Language.Syntax.DSL
 import qualified Language.Syntax.Lenses     as SL
@@ -285,5 +284,8 @@ memberExitNodeValue entry
 isBreakN, isContinueN, isContinueOrBreakN, isReturnN :: CFGNode -> Bool
 isContinueOrBreakN node            = isBreakN node || isContinueN node 
 isBreakN           (_, StatNode s) = SL._Break `is` s
+isBreakN           (_, _)          = False
 isContinueN        (_, StatNode s) = SL._Continue `is` s
+isContinueN        (_, _)          = False
 isReturnN          (_, StatNode s) = SL._Return `is` s
+isReturnN          (_, _)          = False

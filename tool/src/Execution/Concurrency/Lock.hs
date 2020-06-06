@@ -9,8 +9,8 @@ type LockSet = M.Map Reference Int
 
 locked :: Int -> Reference -> Engine r Bool
 locked tid ref = do
-    locks <- getLocks
-    case locks M.!? ref of
+    lockSet <- getLocks
+    case lockSet M.!? ref of
         Nothing   -> return False
         Just lTid -> return (tid /= lTid)
 

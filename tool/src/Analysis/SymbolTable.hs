@@ -71,6 +71,8 @@ matchMethod className@(Identifier _ classPos) methodName retType argTypes table 
             && all (uncurry isOfType) (zip paramTypes argTypes)
             where
                 paramTypes = [ty | (Parameter ty _ _) <- _params]
+        match (SymbolTableEntry _ Field{})
+            = error "matchMethod: unexpected field"
 
 lookupConstructor :: Identifier -> SymbolTable -> Maybe SymbolTableEntries
 lookupConstructor name = lookupMethod name name

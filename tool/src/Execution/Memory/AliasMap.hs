@@ -35,9 +35,7 @@ getAliasesWithoutNull var = do
 
 -- | Returns the set of all other concrete references of the given type.
 otherAliasesOfType :: RuntimeType -> Engine r (S.Set Expression)
-otherAliasesOfType ty = do
-    aliasMap <- getAliasMap
-    return (S.fromList $ concatMap S.toList $ M.elems $ M.filter (any (`isOfType` ty)) aliasMap)
+otherAliasesOfType ty = S.unions . M.elems . M.filter (any (`isOfType` ty)) <$> getAliasMap
 
 -- | Sets the aliases of the given symbolic reference.
 setAliases :: Identifier -> S.Set Expression -> Engine r ()

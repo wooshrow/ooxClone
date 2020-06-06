@@ -8,7 +8,7 @@ import           Polysemy.State
 import           Polysemy.Reader
 import           Polysemy.Error
 import           Polysemy.Cache
-import           Control.Lens
+import           Control.Lens hiding (index, indices, element, children)
 import           Control.Monad
 import           Data.Graph.Inductive.Graph (Node, context)
 import           Text.Pretty
@@ -128,7 +128,7 @@ substitute thread0 expression = foldExpression substitutionAlgebra expression th
                 return (Conditional guard1 true1 false1 ty pos) }
 
 substituteQuantifier :: ([Expression] -> Expression) -> Identifier -> Identifier -> Identifier -> (Thread -> Engine r Expression) -> RuntimeType -> Position -> Thread -> Engine r Expression
-substituteQuantifier quantifier elem range domain formula _ _ thread0 = do
+substituteQuantifier quantifier element range domain formula _ _ thread0 = do
     ref <- readVar thread0 domain
     processRef ref
         (\ concRef -> do
@@ -136,14 +136,14 @@ substituteQuantifier quantifier elem range domain formula _ _ thread0 = do
             let (ArrayValue values) = structure
             formulas <- mapM (\ (value, index) -> do
                 state <- getLocal
-                thread1 <- writeVar thread0 elem value
+                thread1 <- writeVar thread0 element value
                 thread2 <- writeVar thread1 range index
                 f <- substitute thread2 =<< formula thread2
                 putLocal state
                 return f
                 ) ((zip values . map (lit' . intLit')) [0..])
             return $ quantifier formulas)
-        (error "substituteQuantifier: Symbolic Reference")
+        (const (throw (InternalError "substituteQuantifier: Symbolic Reference")))
         infeasible
 
 --------------------------------------------------------------------------------

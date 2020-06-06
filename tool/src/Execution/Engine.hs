@@ -14,9 +14,9 @@ import           Polysemy.Reader
 import           Polysemy.Cache hiding (Store, Contains)
 import           Polysemy.Error hiding (Throw)
 import           Polysemy.State
-import           Control.Monad
+import           Control.Monad hiding (guard)
 import           Control.Monad.Extra
-import           Control.Lens
+import           Control.Lens hiding (assign)
 import           Data.Configuration
 import           Data.Error
 import           Data.Statistics
@@ -38,8 +38,6 @@ import           Execution.Memory.AliasMap
 import           Execution.Evaluation
 import           Verification.Verifier
 import           Verification.Result
-
-import Debug.Trace
 
 --------------------------------------------------------------------------------
 -- Symbolic Execution
@@ -90,9 +88,8 @@ execP = do
             applyPOR                <- applyPOR <$> askConfig
             applyRandomInterleaving <- applyRandomInterleaving <$> askConfig
             enabledThreads          <- filterM isEnabled (S.toList allThreads)
-            when (null enabledThreads) (do
-                programTrace <- getProgramTrace
-                throw (Deadlock programTrace))
+            when (null enabledThreads) 
+                (throw . Deadlock =<< getProgramTrace)
             if applyPOR
                 then do
                     uniqueThreads  <- filterM isUniqueInterleaving enabledThreads
@@ -111,12 +108,11 @@ execP = do
 
 isUniqueInterleaving :: Thread -> Engine r Bool
 isUniqueInterleaving thread = do
-    programTrace <- getProgramTrace
-    constraints <- getInterleavingConstraints
-    return . not . any (isUnique programTrace) $ constraints
-    where 
-        isUnique programTrace (IndependentConstraint previous current)
-            = (thread ^. pc) == current && previous `elem` programTrace
+    currentProgramTrace <- getProgramTrace
+    not . any (isUnique currentProgramTrace) <$> getInterleavingConstraints
+    where
+        isUnique currentProgramTrace (IndependentConstraint previous current)
+            = (thread ^. pc) == current && previous `elem` currentProgramTrace
         isUnique _ NotIndependentConstraint{}
             = False
 
@@ -128,7 +124,7 @@ updateInterleavingConstraints newConstraints = do
 isConflict :: [InterleavingConstraint] -> InterleavingConstraint -> Bool
 isConflict _              (IndependentConstraint _ _)      = False
 isConflict newConstraints (NotIndependentConstraint x1 y1) =
-    any (\case (IndependentConstraint x2 y2)  -> x1 == y2 || x2 == y2
+    any (\case (IndependentConstraint x2 y2)  -> S.fromList [x1, y1] `S.disjoint` S.fromList [x2, y2]
                (NotIndependentConstraint _ _) -> False) newConstraints
 
 --------------------------------------------------------------------------------
@@ -189,16 +185,16 @@ execT thread0@Thread{_pc=(_, _, CallNode entry constructor@Constructor{} Nothing
         step thread1 ((), entry)
     
 -- A Fork
-execT thread@Thread{_pc=(_, _, ForkNode entry method arguments, [neighbour])} = do
+execT thread@Thread{_pc=(_, _, ForkNode entry method arguments, neighbours)} = do
     -- Spawn a new thread and continue the execution.
     _ <- spawn thread entry method arguments
-    step thread neighbour
+    branch_ (step thread) neighbours
 
 -- A Member Entry
 execT thread@Thread{_pc=(_, _, MemberEntry{}, neighbours)} = do
     -- Verify the pre condition if this is not the first call.
-    programTrace <- getProgramTrace
-    case programTrace of
+    currentProgramTrace <- getProgramTrace
+    case currentProgramTrace of
         [] -> return ()
         _  -> whenM (verifyRequires <$> askConfig) (do
                 let requires = getLastStackFrame thread ^. currentMember ^?! SL.specification ^?! SL.requires
@@ -354,11 +350,11 @@ execT thread@Thread{_pc=(_, _, StatNode (Lock var _ _), neighbours)} = do
 
 -- An Unlock Statement
 execT thread@Thread{_pc=(_, _, StatNode (Unlock var _ _), neighbours)} = do
-    value <- readVar thread var
-    case value of
-        Ref ref _ _ -> do
-            unlock ref
-            branch_ (step thread) neighbours
+    ref <- readVar thread var
+    processRef ref
+        (\ concRef -> do unlock concRef; branch_ (step thread) neighbours)
+        (const (throw (InternalError "execT: symbolic reference in unlock statement.")))
+        (throw (InternalError "execT: null in unlock statement."))
             
 -- Any other Statement
 execT thread@Thread{_pc=(_, _, StatNode _, neighbours)} =
@@ -403,6 +399,7 @@ execRhs thread rhs@RhsField{} continueF = do
         SymbolicRef{}     -> initializeSymbolicRef ref >> readSymbolicField ref field >>= continueF
         Lit NullLit{} _ _ -> infeasible
         Conditional{}     -> processRhsFieldCond field ref >>= continueF
+        _                 -> throw (InternalError "execRhs: expected a reference or conditional")
 
 execRhs thread rhs@RhsElem{} continueF = do
     ref <- readVar thread (rhs ^?! SL.var ^?! SL.var)
@@ -411,13 +408,15 @@ execRhs thread rhs@RhsElem{} continueF = do
             evaluatedIndex <- evaluateAsInt thread (rhs ^?! SL.index)
             value <- either (readIndexSymbolic concRef) (readIndex concRef) evaluatedIndex
             continueF value)
-        (error "execRhs: Symbolic Reference")
+        (const (throw (InternalError "execRhs: Symbolic Reference")))
         infeasible
 
 execRhs thread rhs@RhsArray{} continueF = do
     sizes <- mapM (evaluateAsInt thread) (rhs ^?! SL.sizes)
     value <- createArray sizes (typeOf rhs)
     continueF value
+
+execRhs _ RhsCall{} _ = throw (InternalError "execRhs: call rhs cannot be executed")
 
 processRhsFieldCond :: Identifier -> Expression -> Engine r Expression
 processRhsFieldCond field (Conditional guard true false ty info) = do
@@ -430,6 +429,8 @@ processRhsFieldCond field (Ref ref _ _)
     = readField ref field
 processRhsFieldCond field ref@SymbolicRef{}
     = readSymbolicField ref field
+processRhsFieldCond _ _
+    = throw (InternalError "processRhsFieldCond: expected a reference or conditional")
 
 --------------------------------------------------------------------------------
 -- Verification Functions
@@ -463,9 +464,9 @@ assertM thread = maybe (return ()) (assert thread)
 assert :: Thread -> Expression -> Engine r ()
 assert thread assertion = do
     measureVerification
-    assumptions  <- getConstraints
-    config       <- askConfig
-    programTrace <- getProgramTrace
+    assumptions         <- getConstraints
+    config              <- askConfig
+    currentProgramTrace <- getProgramTrace
     let formula0 = ands' (neg' assertion `H.insert` assumptions)
     debug ("Verifying: '" ++ toString formula0 ++ "'")
     if applyLocalSolver config
@@ -474,21 +475,20 @@ assert thread assertion = do
             case formula1 of
                 Right True -> do
                     measureLocalSolve
-                    programTrace <- getProgramTrace
-                    throw (Invalid (getPos assertion) programTrace)
+                    throw (Invalid (getPos assertion) currentProgramTrace)
                 Right False -> do
                     measureLocalSolve
                     return ()
                 Left formula2 -> do
                     aliasMap <- getAliasMap
-                    let verification = verify programTrace aliasMap (getPos assertion) formula2
+                    let verification = verify currentProgramTrace aliasMap (getPos assertion) formula2
                     if cacheFormulas config 
                         then underCache formula2 verification
                         else verification
         else do
             formula1 <- substitute thread formula0
             aliasMap <- getAliasMap
-            let verification = verify programTrace aliasMap (getPos assertion) formula1
+            let verification = verify currentProgramTrace aliasMap (getPos assertion) formula1
             if cacheFormulas config
                 then underCache formula1 verification
                 else verification
@@ -502,8 +502,8 @@ branchCS_ _      []       continueF = continueF
 branchCS_ thread (cs:css) continueF = branchC_ thread cs (branchCS_ thread css continueF)
 
 branchC_ :: Thread -> [Concretization] -> Engine r () -> Engine r ()
-branchC_ _      [] continueF = continueF
-branchC_ thread cs continueF = branch_ (\ concretization -> do
+branchC_ _ [] continueF = continueF
+branchC_ _ cs continueF = branch_ (\ concretization -> do
     mapM_ (\ (symRef, concRef) -> setAliases symRef (S.singleton concRef)) (M.toList concretization)
     continueF) cs
 

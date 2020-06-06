@@ -3,9 +3,10 @@ module Execution.Memory.Heap where
 import qualified Data.Map                 as M
 import qualified Data.Set                 as S
 import           Data.Maybe
-import           Control.Lens
+import           Control.Lens hiding (index, indices)
 import           Control.Monad
 import           Polysemy.Reader
+import           Polysemy.Error
 import           Text.Pretty
 import           Execution.ExecutionState
 import           Execution.Memory.AliasMap
@@ -17,6 +18,7 @@ import           Language.Syntax.DSL
 import           Language.Syntax.Pretty()
 import qualified Language.Syntax.Lenses    as SL
 import           Analysis.Type.Typeable
+import           Verification.Result
 
 --------------------------------------------------------------------------------
 -- The Heap Type
@@ -40,7 +42,7 @@ instance Typeable HeapValue where
 dereference :: Reference -> Engine r HeapValue
 dereference ref = do
     structure <- (M.!? ref) <$> getHeap
-    return $ fromMaybe (segfault ref) structure
+    maybe (segfault ref) return structure
     
 allocate :: HeapValue -> Engine r Expression
 allocate value = do
@@ -58,9 +60,10 @@ processRef expression onConcRef onSymRef onNull
                 then case S.findMin aliases of
                         Ref concRef _ _   -> onConcRef concRef
                         Lit NullLit{} _ _ -> onNull
+                        _                 -> throw (InternalError "processRef: not a reference in alias map")
                 else onSymRef expression
         Lit NullLit{} _ _ -> onNull
-        _                 -> error ("processRef: " ++ toString expression)
+        _                 -> throw (InternalError ("processRef: " ++ toString expression))
     
 --------------------------------------------------------------------------------
 -- Field Reading
@@ -71,7 +74,7 @@ readField ref field = do
     let (ObjectValue values _) = structure
     case values M.!? field of
         Just value -> return value
-        Nothing    -> error ("readField: " ++ toString field)
+        Nothing    -> throw (InternalError ("readField: " ++ toString field))
 
 readSymbolicField :: Expression -> Identifier -> Engine r Expression
 readSymbolicField var@(SymbolicRef symRef _ _) field = do
@@ -109,7 +112,7 @@ createArray (Right size:sizes) ty = do
     let structure = ArrayValue refs
     allocate structure
 createArray [Left size] _ = 
-    error $ "cannot create an array of symbolic size '" ++ toString size ++ "'"
+    throw (InternalError ("createArray: symbolic size '" ++ toString size ++ "'"))
 
 writeIndex :: Reference -> Int -> Expression -> Engine r ()
 writeIndex ref index value = do
@@ -152,7 +155,7 @@ readIndexSymbolic ref symIndex = do
     structure <- dereference ref
     let (ArrayValue values) = structure
     let indices = map (lit' . intLit') [1..]
-    let value = foldr (\ (value, concIndex) -> conditional' (symIndex `equal'` concIndex) value) (values ^?! _head) (zip (values ^?! _tail) indices)
+    let value = foldr (\ (value', concIndex) -> conditional' (symIndex `equal'` concIndex) value') (values ^?! _head) (zip (values ^?! _tail) indices)
     return value
 
 --------------------------------------------------------------------------------
@@ -227,5 +230,5 @@ createSymbolicVar (Identifier name pos) ty
 newRef :: Heap -> Reference
 newRef heap = 1 + M.size heap
                    
-segfault :: Reference -> a
-segfault ref = error $ "segfault on reference '" ++ show ref ++ "'" 
+segfault :: Reference -> Engine r HeapValue
+segfault ref = throw (InternalError ("segfault on reference '" ++ show ref ++ "'"))

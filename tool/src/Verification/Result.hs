@@ -3,8 +3,6 @@ module Verification.Result where
 import Prelude hiding ((<>))
 import Text.Pretty
 import Data.Positioned
-import Language.Syntax
-import Language.Syntax.Pretty()
 import Analysis.CFA.CFG
 
 data VerificationResult
@@ -12,38 +10,24 @@ data VerificationResult
     | Invalid Position [CFGContext]
     | Unknown Position [CFGContext]
     | Deadlock [CFGContext]
+    | InternalError String
     | Infeasible
 
-isValid, isInvalid, isUnknown, isDeadlock :: VerificationResult -> Bool
-isValid    result = case result of Valid{}    -> True; _ -> False  
-isInvalid  result = case result of Invalid{}  -> True; _ -> False  
-isUnknown  result = case result of Unknown{}  -> True; _ -> False  
-isDeadlock result = case result of Deadlock{} -> True; _ -> False  
+isValid, isInvalid, isUnknown, isDeadlock, isInternalError :: VerificationResult -> Bool
+isValid         result = case result of Valid{}         -> True; _ -> False  
+isInvalid       result = case result of Invalid{}       -> True; _ -> False  
+isUnknown       result = case result of Unknown{}       -> True; _ -> False  
+isDeadlock      result = case result of Deadlock{}      -> True; _ -> False  
+isInternalError result = case result of InternalError{} -> True; _ -> False  
 
 instance Pretty [VerificationResult] where
-    pretty [] = empty
+    pretty []       = empty
     pretty (vc:vcs) = pretty vc $+$ pretty vcs
 
 instance Pretty VerificationResult where
-    pretty Valid                      = text "VALID"
-    pretty (Invalid pos programTrace) = text "INVALID assertion" <+> pretty pos -- $+$ (tab (pretty programTrace)
-    pretty (Unknown pos programTrace) = text "UNKNOWN assertion" <+> pretty pos -- $+$ tab (pretty programTrace)
-    pretty (Deadlock programTrace)    = text "DEADLOCK" -- $+$ tab (pretty programTrace)
-    pretty Infeasible                 = text "INFEASIBLE"
-
-instance Pretty [CFGContext] where
-    pretty = mconcat . map prettyTraceValue
-
-prettyTraceValue :: CFGContext -> Doc
-prettyTraceValue (_, _, (StatNode Ite{})  , _)     = empty
-prettyTraceValue (_, _, (StatNode While{}), _)     = empty
-prettyTraceValue (_, _, (StatNode stat), _)        = pretty stat
-prettyTraceValue (_, _, node@CallNode{}, _)        = pretty node 
-prettyTraceValue (_, _, node@ForkNode{}, _)        = pretty node 
-prettyTraceValue (_, _, node@MemberEntry{}, _)     = pretty node 
-prettyTraceValue (_, _, node@MemberExit{}, _)      = pretty node 
-prettyTraceValue (_, _, node@ExceptionalNode{}, _) = pretty node 
-prettyTraceValue (_, _, node@TryEntry{}, _)        = pretty node 
-prettyTraceValue (_, _, node@TryExit{}, _)         = pretty node 
-prettyTraceValue (_, _, node@CatchEntry{}, _)      = pretty node 
-prettyTraceValue (_, _, node@CatchExit{}, _)       = pretty node 
+    pretty Valid                   = text "VALID"
+    pretty (Invalid pos _)         = text "INVALID assertion" <+> pretty pos
+    pretty (Unknown pos _)         = text "UNKNOWN assertion" <+> pretty pos
+    pretty (Deadlock _)            = text "DEADLOCK"
+    pretty Infeasible              = text "INFEASIBLE"
+    pretty (InternalError message) = text "INTERNAL ERROR '" <+> pretty message <+> text "'"

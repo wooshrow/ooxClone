@@ -74,7 +74,7 @@ evaluate thread0 expression = foldExpression algebra expression thread0
                 ref <- readVar thread var
                 processRef ref
                     (fmap (lit' . intLit') . arraySize)
-                    (error "evaluate: SizeOf of symbolic reference")
+                    (const (throw (InternalError "evaluate: SizeOf of symbolic reference")))
                     infeasible
                     
             , fRef = \ ref ty pos _ -> 
@@ -96,7 +96,7 @@ evaluate thread0 expression = foldExpression algebra expression thread0
                         return $ Conditional guard1 true1 false1 ty pos }
 
 evaluateQuantifier :: ([Expression] -> Expression) -> Identifier -> Identifier -> Identifier -> (Thread -> Engine r Expression) -> RuntimeType -> Position -> Thread -> Engine r Expression
-evaluateQuantifier quantifier elem range domain formula0 _ _ thread0 = do
+evaluateQuantifier quantifier element range domain formula0 _ _ thread0 = do
     ref <- readVar thread0 domain
     processRef ref
         (\ concRef -> do
@@ -104,22 +104,23 @@ evaluateQuantifier quantifier elem range domain formula0 _ _ thread0 = do
             let (ArrayValue values) = structure
             formulas <- mapM (\ (value, index) -> do
                 state    <- getLocal
-                thread1  <- writeVar thread0 elem value
+                thread1  <- writeVar thread0 element value
                 thread2  <- writeVar thread1 range index
                 formula1 <- formula0 thread2
                 putLocal state
                 return formula1
                 ) ((zip values . map (lit' . intLit')) [0..])
             evaluate thread0 (quantifier formulas))
-        (error "evaluateQuantifierAsBool: symbolic reference")
+        (const (throw (InternalError "evaluateQuantifierAsBool: symbolic reference")))
         infeasible
 
 evaluateBinOp :: BinOp -> Expression -> Expression ->  RuntimeType -> Position -> Engine r Expression
 -- Boolean Evaluation
 evaluateBinOp op (Lit (BoolLit a _) _ _) (Lit (BoolLit b _) _ _) ty pos = do
-    let lit = case op of Implies  -> BoolLit (not a || b); And   -> BoolLit (a && b)
-                         Or       -> BoolLit (a || b)    ; Equal -> BoolLit (a == b)
-                         NotEqual -> BoolLit (a /= b)    
+    lit <- case op of Implies  -> return (BoolLit (not a || b)); And   -> return (BoolLit (a && b))
+                      Or       -> return (BoolLit (a || b))    ; Equal -> return (BoolLit (a == b))
+                      NotEqual -> return (BoolLit (a /= b))    
+                      _        -> throw (InternalError "evaluateBinOp: unsupported operator")
     return $ Lit (lit pos) ty pos
 
 evaluateBinOp op expressionA@(Lit (BoolLit a _) _ _) expressionB ty pos =
@@ -140,30 +141,42 @@ evaluateBinOp op expressionA expressionB@(Lit (BoolLit b _) _ _) ty pos =
 evaluateBinOp Divide _ (Lit (IntLit 0 _) _ _) _ _ = infeasible
 evaluateBinOp Modulo _ (Lit (IntLit 0 _) _ _) _ _ = infeasible
 evaluateBinOp op (Lit (IntLit a _) _ _) (Lit (IntLit b _) _ _) ty pos = do
-    let lit = case op of Equal       -> BoolLit (a == b)   ; NotEqual         -> BoolLit (a /= b)   
-                         LessThan    -> BoolLit (a < b)    ; LessThanEqual    -> BoolLit (a <= b)   
-                         GreaterThan -> BoolLit (a > b)    ; GreaterThanEqual -> BoolLit (a >= b)   
-                         Plus        -> IntLit  (a + b)    ; Minus            -> IntLit  (a - b)    
-                         Multiply    -> IntLit  (a * b)    ; Divide           -> IntLit (a `div` b)
-                         Modulo      -> IntLit (a `mod` b)
+    lit <- case op of Equal       -> return (BoolLit (a == b))  ; NotEqual         -> return (BoolLit (a /= b))
+                      LessThan    -> return (BoolLit (a < b))   ; LessThanEqual    -> return (BoolLit (a <= b))
+                      GreaterThan -> return (BoolLit (a > b))   ; GreaterThanEqual -> return (BoolLit (a >= b))
+                      Plus        -> return (IntLit  (a + b))   ; Minus            -> return (IntLit  (a - b))
+                      Multiply    -> return (IntLit  (a * b))   ; Divide           -> return (IntLit (a `div` b))
+                      Modulo      -> return (IntLit (a `mod` b))
+                      _           -> throw (InternalError "evaluateBinOp: unsupported operator")
     return $ Lit (lit pos) ty pos
 
 -- Reference Evaluation
 evaluateBinOp op (Ref a _ _) (Ref b _ _) ty pos = do
-    let lit = case op of Equal -> BoolLit (a == b); NotEqual -> BoolLit (a /= b)
+    lit <- case op of Equal    -> return (BoolLit (a == b)) 
+                      NotEqual -> return (BoolLit (a /= b))
+                      _        -> throw (InternalError "evaluateBinOp: unsupported operator")
     return $ Lit (lit pos) ty pos
 evaluateBinOp op Ref{} (Lit (NullLit _) _ _) ty pos = do
-    let lit = case op of Equal -> BoolLit False; NotEqual -> BoolLit True
+    lit <- case op of Equal    -> return (BoolLit False)
+                      NotEqual -> return (BoolLit True)
+                      _        -> throw (InternalError "evaluateBinOp: unsupported operator")
     return $ Lit (lit pos) ty pos
 evaluateBinOp op (Lit (NullLit _) _ _)  Ref{} ty pos = do
-    let lit = case op of Equal -> BoolLit False; NotEqual -> BoolLit True
+    lit <- case op of Equal    -> return (BoolLit False)
+                      NotEqual -> return (BoolLit True)
+                      _        -> throw (InternalError "evaluateBinOp: unsupported operator")
     return $ Lit (lit pos) ty pos
 evaluateBinOp op (Lit (NullLit _) _ _) (Lit (NullLit _) _ _) ty pos = do
-    let lit = case op of Equal -> BoolLit True; NotEqual -> BoolLit False
+    lit <- case op of Equal    -> return (BoolLit True)
+                      NotEqual -> return (BoolLit False)
+                      _        -> throw (InternalError "evaluateBinOp: unsupported operator")
     return $ Lit (lit pos) ty pos
 evaluateBinOp op expressionA@(SymbolicRef a _ _) expressionB@(SymbolicRef b _ _) ty pos
     | a == b 
-        = return $ Lit (BoolLit (case op of Equal -> True; NotEqual -> False) pos) ty pos
+        = case op of
+                Equal    -> return $ Lit (BoolLit True pos) ty pos
+                NotEqual -> return $ Lit (BoolLit False pos) ty pos
+                _        -> throw (InternalError "evaluateBinOp: unsupported operator")
     | otherwise
         = return $ BinOp op expressionA expressionB ty pos
 

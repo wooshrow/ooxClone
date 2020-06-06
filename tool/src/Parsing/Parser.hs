@@ -1,7 +1,7 @@
 module Parsing.Parser where
 
 import           Control.Monad       (when)
-import           Text.Parsec         hiding (getPosition, Empty)
+import           Text.Parsec         hiding (getPosition, sourceLine, sourceColumn, Empty)
 import qualified Text.Parsec         as P (getPosition)
 import qualified Text.Parsec.Pos     as P (SourcePos, newPos)
 import           Text.Parsec.Error  
@@ -16,8 +16,8 @@ import           Data.Error
 type P = Parsec [Positioned Token] ()
 
 parser :: FilePath -> [Positioned Token] -> Erroneous CompilationUnit
-parser fileName tokens =
-    case parse pCompilationUnit fileName tokens of
+parser fileName input =
+    case parse pCompilationUnit fileName input of
         Left err     -> Left $ syntacticalError (sourcePosToPosition (errorPos err)) (getErrorMessage err)
         Right result -> Right result
 
@@ -411,8 +411,8 @@ pBoolLit = do
 
 pIntLit :: P Lit
 pIntLit = do
-    sourceName <- getSourceName
-    token showToken (posFromToken sourceName) (matchToken sourceName)
+    sourceFileName <- getSourceName
+    token showToken (posFromToken sourceFileName) (matchToken sourceFileName)
     where
         showToken (Positioned _ tok') = toString tok'
         matchToken name (Positioned pos (TIntLiteral value)) = intLiteral value (pos{sourceFile=name})
@@ -424,8 +424,8 @@ pIntLit = do
 
 pRealLit :: P Lit
 pRealLit = do
-    sourceName <- getSourceName
-    token showToken (posFromToken sourceName) matchToken
+    sourceFileName <- getSourceName
+    token showToken (posFromToken sourceFileName) matchToken
     where
         showToken (Positioned _ tok') = toString tok'
         matchToken (Positioned pos (TRealLiteral value)) = Just $ FloatLit value pos
@@ -433,8 +433,8 @@ pRealLit = do
 
 pStringLit :: P Lit
 pStringLit = do
-    sourceName <- getSourceName
-    token showToken (posFromToken sourceName) matchToken
+    sourceFileName <- getSourceName
+    token showToken (posFromToken sourceFileName) matchToken
     where
         showToken (Positioned _ tok') = toString tok'
         matchToken (Positioned pos (TStringLiteral value)) = Just $ StringLit value pos
@@ -442,8 +442,8 @@ pStringLit = do
 
 pCharLit :: P Lit
 pCharLit = do
-    sourceName <- getSourceName
-    token showToken (posFromToken sourceName) matchToken
+    sourceFileName <- getSourceName
+    token showToken (posFromToken sourceFileName) matchToken
     where
         showToken (Positioned _ tok') = toString tok'
         matchToken (Positioned pos (TCharLiteral value)) = Just $ CharLit value pos
@@ -500,8 +500,8 @@ pArrayRanks = do
 
 pToken :: Token -> P ()
 pToken tok = do
-    name <- getSourceName
-    token showToken (posFromToken name) matchToken <?> toString tok
+    sourceFileName <- getSourceName
+    token showToken (posFromToken sourceFileName) matchToken <?> toString tok
     where
         showToken (Positioned _ tok') = toString tok'
         matchToken (Positioned _ tok') = if tok == tok' then Just () else Nothing
@@ -525,8 +525,8 @@ pDot = pToken TDot
 pIdentifier :: P Identifier
 pIdentifier = do
     pos <- getPosition
-    name <- getSourceName
-    Identifier <$> token showToken (posFromToken name) matchToken <*> pure pos
+    sourceFileName <- getSourceName
+    Identifier <$> token showToken (posFromToken sourceFileName) matchToken <*> pure pos
     where
         showToken (Positioned _ tok') = toString tok'
         matchToken (Positioned _ (TIdentifier s)) = Just s
@@ -546,8 +546,8 @@ pBetweenSquare :: P a -> P a
 pBetweenSquare = between pSOpen pSClose
 
 posFromToken :: SourceName -> Positioned a -> P.SourcePos
-posFromToken sourceFile (Positioned (SourcePos _ sourceLine sourceColumn) _) 
-    = P.newPos sourceFile sourceLine sourceColumn
+posFromToken sourceFileName (Positioned pos _) 
+    = P.newPos sourceFileName (sourceLine pos) (sourceColumn pos)
 
 getSourceName :: P SourceName
 getSourceName = sourceFile <$> getPosition
@@ -617,16 +617,17 @@ exceptionalInvocation invocation
                 = S.empty
 
 exceptionalExpression :: Expression -> S.Set Expression
-exceptionalExpression exp 
-    = if null exceptions then S.empty else S.singleton (ors' exceptions)
+exceptionalExpression expression 
+    | null exceptions = S.empty
+    | otherwise       = S.singleton (ors' exceptions)
     where
-        exceptions = exceptional' exp
-        exceptional' exp' 
-            = case exp' of
+        exceptions = exceptional' expression
+        exceptional' expression' 
+            = case expression' of
                 Forall{..} -> S.singleton (var' _domain BoolRuntimeType `equal'` lit' nullLit') `S.union` exceptional' _formula
                 Exists{..} -> S.singleton (var' _domain BoolRuntimeType `equal'` lit' nullLit') `S.union` exceptional' _formula
                 BinOp{..}  -> 
-                    let condition = _rhs `equal'` lit' (IntLit 0 (getPos exp'))
+                    let condition = _rhs `equal'` lit' (IntLit 0 (getPos expression'))
                         in (case _binOp of
                             Divide -> S.singleton condition
                             Modulo -> S.singleton condition

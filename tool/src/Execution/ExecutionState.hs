@@ -64,10 +64,11 @@ type Engine r a = Members [ Reader (Configuration, ControlFlowGraph, SymbolTable
 defaultValue :: Typeable a => a -> Expression
 defaultValue ty = lit' $ 
     case typeOf ty of
-        UIntRuntimeType  -> uIntLit'  0   ; IntRuntimeType         -> intLit'  0
-        FloatRuntimeType -> floatLit' 0.0 ; BoolRuntimeType        -> boolLit' False
-        CharRuntimeType  -> charLit'  "\0"; ReferenceRuntimeType{} -> nullLit'
-        ARRAYRuntimeType -> nullLit'      ; ArrayRuntimeType{}     -> nullLit'
+        UIntRuntimeType   -> uIntLit'  0   ; IntRuntimeType         -> intLit'  0
+        FloatRuntimeType  -> floatLit' 0.0 ; BoolRuntimeType        -> boolLit' False
+        CharRuntimeType   -> charLit'  "\0"; ReferenceRuntimeType{} -> nullLit'
+        ARRAYRuntimeType  -> nullLit'      ; ArrayRuntimeType{}     -> nullLit'
+        StringRuntimeType -> nullLit'
 
 -- | An Evaluation Result is either a (simplified) expression or the result type.
 type EvaluationResult a = Either Expression a

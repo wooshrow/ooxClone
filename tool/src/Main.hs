@@ -23,7 +23,7 @@ allPhases = parsingPhase >>= analysisPhase >>= uncurry executionPhase
 executeOnce :: Configuration -> IO (VerificationResult, Statistics)
 executeOnce config = do
     startTime <- getCurrentTime
-    (statistics, result) <- runM run
+    (statistics, result) <- runM (runState initialStatistics (runReader config (runError allPhases)))
     endTime <- getCurrentTime
     let runtime = endTime `diffUTCTime` startTime
     putStrLn "Statistics"
@@ -39,8 +39,6 @@ executeOnce config = do
     putStrLn $ "\t Total #Z3 invocations:\t" ++ show (_numberOfZ3Invocations statistics)
     putStrLn $ "\t Maximum #forks:\t" ++ show (_maximumNumberOfThreads statistics)
     return (either (const (error "error result")) id result, statistics{_totalRuntime = runtime})
-    where
-        run = runState initialStatistics (runReader config (runError allPhases))
 
 execute :: Configuration -> IO (VerificationResult, [Statistics])
 execute config@Configuration{runBenchmark} 
@@ -53,21 +51,6 @@ execute config@Configuration{runBenchmark}
     | otherwise = do
         (result, statistic) <- executeOnce config
         return (result, [statistic])
-
---------------------------------------------------------------------------------
--- Experiment execution
---------------------------------------------------------------------------------
-
-stddev :: [Double] -> Double
-stddev xs = sqrt . average . map ((^ 2) . (-) axs) $ xs
-    where
-        axs = average xs
-
-stddevRuntime :: [NominalDiffTime] -> NominalDiffTime
-stddevRuntime = fromRational . realToFrac . stddev . map (realToFrac . toRational)
-
-average :: [Double] -> Double
-average xs = sum xs / realToFrac (length xs)
 
 averageRuntime :: [NominalDiffTime] -> NominalDiffTime
 averageRuntime xs = fromRational (sum (map toRational xs) / toRational (length xs))
