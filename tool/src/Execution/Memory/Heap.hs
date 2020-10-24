@@ -9,8 +9,9 @@ import           Polysemy.Reader
 import           Polysemy.Error              
 import           Polysemy.LocalState
 import           Text.Pretty
-import           Execution.ExecutionState
-import           Execution.Memory.AliasMap
+import           Execution.State
+import           Execution.State.AliasMap as AliasMap
+import           Execution.State.Heap     as Heap
 import           Analysis.SymbolTable
 import           Data.Positioned
 import           Data.Configuration
@@ -22,33 +23,18 @@ import           Analysis.Type.Typeable
 import           Verification.Result
 
 --------------------------------------------------------------------------------
--- The Heap Type
---------------------------------------------------------------------------------
-
-type Heap = M.Map Reference HeapValue
-
-data HeapValue 
-    = ObjectValue (M.Map Identifier Expression) RuntimeType
-    | ArrayValue  [Expression]
-    deriving (Show)
-
-instance Typeable HeapValue where
-    typeOf (ObjectValue _ ty)  = ty
-    typeOf (ArrayValue values) = ArrayRuntimeType (typeOf (head values))
-
---------------------------------------------------------------------------------
 -- High level Heap functions
 --------------------------------------------------------------------------------
 
 dereference :: Reference -> Engine r HeapValue
 dereference ref = do
-    structure <- (M.!? ref) <$> getHeap
+    structure <- Heap.lookup ref <$> getHeap
     maybe (segfault ref) return structure
     
 allocate :: HeapValue -> Engine r Expression
 allocate value = do
     ref <- newRef <$> getHeap
-    modifyLocal (\ state -> state & (heap %~ M.insert ref value))
+    modifyLocal (\ state -> state & (heap %~ Heap.insert ref value))
     return $ Ref ref (typeOf value) unknownPos
 
 processRef :: Expression -> (Reference -> Engine r a) -> (Expression -> Engine r a) -> Engine r a -> Engine r a
@@ -91,7 +77,7 @@ writeField ref field value = do
     structure <- dereference ref
     let (ObjectValue values ty) = structure
     let newStructure = ObjectValue (M.insert field value values) ty
-    modifyLocal (\ state -> state & (heap %~ M.insert ref newStructure))
+    modifyLocal (\ state -> state & (heap %~ Heap.insert ref newStructure))
 
 writeSymbolicField :: Expression -> Expression -> Identifier -> Expression -> Engine r ()
 writeSymbolicField symRef concRef@(Ref ref _ _) field value = do
@@ -123,7 +109,7 @@ writeIndex ref index value = do
     structure <- dereference ref
     let (ArrayValue values) = structure
     let newStructure = ArrayValue (values & (element index .~ value))
-    modifyLocal (\ state -> state & (heap %~ M.insert ref newStructure))
+    modifyLocal (\ state -> state & (heap %~ Heap.insert ref newStructure))
 
 writeIndexSymbolic :: Reference -> Expression -> Expression -> Engine r ()
 writeIndexSymbolic ref symIndex value = do
@@ -131,7 +117,7 @@ writeIndexSymbolic ref symIndex value = do
     let (ArrayValue values) = structure
     let indices = map (lit' . intLit') [0..]
     let newStructure = ArrayValue $ map (\ (oldValue, concIndex) -> conditional' (symIndex `equal'` concIndex) value oldValue) (zip values indices)
-    modifyLocal (\ state -> state & (heap %~ M.insert ref newStructure))
+    modifyLocal (\ state -> state & (heap %~ Heap.insert ref newStructure))
 
 --------------------------------------------------------------------------------
 -- Array Reading
@@ -165,7 +151,7 @@ readIndexSymbolic ref symIndex = do
 
 initializeSymbolicRef :: Expression -> Engine r ()
 initializeSymbolicRef var@(SymbolicRef symRef ty _) = do
-    isInitialized <- M.member symRef <$> getAliasMap
+    isInitialized <- AliasMap.member symRef <$> getAliasMap
     unless isInitialized $ do
         debug ("Initializing symbolic reference '" ++ toString var ++ "'")
         if ty `isOfType` ARRAYRuntimeType
@@ -225,11 +211,41 @@ createSymbolicVar (Identifier name pos) ty
     | otherwise                    = SymbolicVar (Identifier ('_' : name) pos) (typeOf ty) pos
 
 --------------------------------------------------------------------------------
+-- Alias map operations
+--------------------------------------------------------------------------------
+
+-- | Returns the set of all aliases of the given symbolic reference.
+getAliases :: Identifier -> Engine r (Maybe (S.Set Expression))
+getAliases var = AliasMap.lookup var <$> getAliasMap
+
+-- | Returns the set (excluding null) of all aliases of the given symbolic reference.
+getAliasesWithoutNull :: Identifier -> Engine r (Maybe (S.Set Expression))
+getAliasesWithoutNull var = do
+    mConcretes <- getAliases var
+    case mConcretes of
+        Just concretes -> do
+            let concretes' = S.delete (lit' nullLit') concretes
+            modifyLocal (\ state -> state & (aliasMap %~ AliasMap.insert var concretes'))
+            return $ Just concretes'
+        Nothing -> return Nothing
+
+-- | Returns the set of all other concrete references of the given type.
+otherAliasesOfType :: RuntimeType -> Engine r (S.Set Expression)
+otherAliasesOfType ty = S.unions . AliasMap.elems . AliasMap.filter (any (`isOfType` ty)) <$> getAliasMap
+
+-- | Sets the aliases of the given symbolic reference.
+setAliases :: Identifier -> S.Set Expression -> Engine r ()
+setAliases var newAliases = do
+    oldAliases <- fromMaybe S.empty <$> getAliases var
+    debug ("Updating the alias map entry of '" ++ toString var ++ "' from '" ++ toString oldAliases ++ "' to '" ++ toString newAliases ++ "'")
+    modifyLocal (\ state -> state & (aliasMap %~ AliasMap.insert var newAliases))
+
+--------------------------------------------------------------------------------
 -- Low level heap operations
 --------------------------------------------------------------------------------
 
 newRef :: Heap -> Reference
-newRef heap = 1 + M.size heap
+newRef heap = 1 + Heap.size heap
                    
 segfault :: Reference -> Engine r HeapValue
 segfault ref = throw (InternalError ("segfault on reference '" ++ show ref ++ "'"))

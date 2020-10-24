@@ -7,8 +7,8 @@ import           Control.Monad
 import           Control.Lens
 import           Execution.Concurrency.Thread
 import           Execution.Memory.Heap
-import           Execution.ExecutionState
-import           Execution.Memory.AliasMap
+import           Execution.State
+import           Execution.State.Thread
 import           Analysis.CFA.CFG
 import           Text.Pretty
 import           Language.Syntax

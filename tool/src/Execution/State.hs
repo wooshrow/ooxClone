@@ -1,8 +1,6 @@
-module Execution.ExecutionState where
+module Execution.State where
     
-import qualified Data.Map                 as M
 import qualified Data.Set                 as S
-import qualified Data.HashSet             as H
 import           Data.Foldable
 import           Control.Lens
 import           Control.Monad
@@ -13,11 +11,12 @@ import           Polysemy.Reader
 import           Polysemy.Error 
 import           Polysemy.State
 import           Polysemy.Cache
-import {-# SOURCE #-} Execution.Memory.Heap
-import {-# SOURCE #-} Execution.Memory.AliasMap
-import {-# SOURCE #-} Execution.Concurrency.Thread
-import {-# SOURCE #-} Execution.Concurrency.Lock
 import {-# SOURCE #-} Execution.Concurrency.POR
+import           Execution.State.PathConstraints
+import           Execution.State.LockSet
+import           Execution.State.Thread
+import           Execution.State.AliasMap
+import           Execution.State.Heap
 import           Data.Configuration
 import           Data.Statistics
 import           Analysis.CFA.CFG
@@ -29,7 +28,7 @@ import           Language.Syntax.DSL
 
 data ExecutionState = ExecutionState
     { _threads                 :: S.Set Thread
-    , _constraints             :: H.HashSet Expression
+    , _constraints             :: PathConstraints
     , _heap                    :: !Heap
     , _aliasMap                :: !AliasMap
     , _locks                   :: !LockSet
@@ -42,14 +41,14 @@ data ExecutionState = ExecutionState
 $(makeLenses ''ExecutionState)
 
 emptyState :: ExecutionState
-emptyState = ExecutionState { _threads                 = S.empty
-                            , _constraints             = H.empty
-                            , _heap                    = M.empty
-                            , _aliasMap                = M.empty
-                            , _locks                   = M.empty
+emptyState = ExecutionState { _threads                 = mempty
+                            , _constraints             = mempty
+                            , _heap                    = mempty
+                            , _aliasMap                = mempty
+                            , _locks                   = mempty
                             , _numberOfForks           = 0
-                            , _interleavingConstraints = []
-                            , _programTrace            = []
+                            , _interleavingConstraints = mempty
+                            , _programTrace            = mempty
                             , _remainingK              = 0 }
 
 type Engine r a = Members [ Reader (Configuration, ControlFlowGraph, SymbolTable)
@@ -100,7 +99,7 @@ haltInfeasible e          = throw e
 getThreads :: Engine r (S.Set Thread)
 getThreads = (^. threads) <$> getLocal
 
-getConstraints :: Engine r (H.HashSet Expression)
+getConstraints :: Engine r PathConstraints
 getConstraints = (^. constraints) <$> getLocal
 
 getHeap :: Engine r Heap

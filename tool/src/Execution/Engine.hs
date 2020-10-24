@@ -2,10 +2,8 @@ module Execution.Engine(
     execute
 ) where
 
-import           Prelude hiding (read)
 import qualified Data.Set                   as S
 import qualified Data.Map                   as M
-import qualified Data.HashSet               as H
 import           System.Random.Shuffle
 import           Data.Maybe
 import           Data.Graph.Inductive.Graph         (Node, context)
@@ -32,10 +30,12 @@ import           Analysis.SymbolTable
 import           Analysis.Type.Typeable
 import           Execution.Concurrency.Thread
 import           Execution.Concurrency.POR
-import           Execution.Concurrency.Lock
-import           Execution.ExecutionState
+import           Execution.State
+import           Execution.State.PathConstraints as PathConstraints
+import           Execution.State.Thread
+import           Execution.State.AliasMap as AliasMap
+import           Execution.State.Heap as Heap
 import           Execution.Memory.Heap
-import           Execution.Memory.AliasMap
 import           Execution.Evaluation
 import           Verification.Verifier
 import           Verification.Result
@@ -119,7 +119,7 @@ isUniqueInterleaving thread = do
 
 updateInterleavingConstraints :: InterleavingConstraints -> Engine r ()
 updateInterleavingConstraints newConstraints = do
-    oldConstraints <- filter (isConflict newConstraints) <$> getInterleavingConstraints
+    oldConstraints <- Prelude.filter (isConflict newConstraints) <$> getInterleavingConstraints
     modifyLocal (\ state -> state & (interleavingConstraints .~ (oldConstraints ++ newConstraints)))
 
 isConflict :: [InterleavingConstraint] -> InterleavingConstraint -> Bool
@@ -238,7 +238,7 @@ execT thread0@Thread{_pc=(adj, node, MemberExit returnTy a b c ensures, [])}
                         -- Copy the retval to the new stack frame and continue with an assignment.
                         let assign = assign' lhs (rhsExpr' (var' retval' returnTy))
                         value <- readVar thread0 retval'
-                        thread2 <- writeAndSubstituteVar thread1 retval' value
+                        thread2 <- writeAndEvaluateVar thread1 retval' value
                         execT thread2{_pc=(adj, node, StatNode assign, [neighbour])}
                     Nothing  -> 
                         -- No assignment to be done, continue the execution.
@@ -279,7 +279,7 @@ execT thread0@Thread{_pc=(_, _, StatNode (Assign lhs rhs _ _), neighbours)} =
         _   -> execRhs thread0 rhs $ \ value ->
                 case lhs of
                     LhsVar{} -> do
-                        thread1 <- writeAndSubstituteVar thread0 (lhs ^?! SL.var) value
+                        thread1 <- writeAndEvaluateVar thread0 (lhs ^?! SL.var) value
                         branch_ (step thread1) neighbours
                     LhsField{} -> do
                         let field = lhs ^?! SL.field
@@ -328,7 +328,7 @@ execT thread@Thread{_pc=(_, _, StatNode (Assume assumption _ _), neighbours)} = 
 execT thread0@Thread{_pc=(_, _, StatNode (Return expression _ _), neighbours)} = do
     concretizations <- concretesOfTypeM thread0 ARRAYRuntimeType expression
     branchC_ thread0 concretizations $ do
-        thread1 <- maybe (return thread0) (writeAndSubstituteVar thread0 retval') expression
+        thread1 <- maybe (return thread0) (writeAndEvaluateVar thread0 retval') expression
         branch_ (step thread1) neighbours
 
 -- A Lock Statement
@@ -384,13 +384,9 @@ execRhs :: Thread -> Rhs -> (Expression -> Engine r ()) -> Engine r ()
 execRhs thread rhs@RhsExpression{} continueF = do
     concretizations <- concretesOfType thread ARRAYRuntimeType (rhs ^?! SL.value)
     branchC_ thread concretizations $ do
-        localSolving <- applyLocalSolver <$> askConfig
-        if localSolving
-            then do
-                value' <- evaluate thread (rhs ^?! SL.value)
-                debug ("Evaluated rhs '" ++ toString rhs ++ "' to '" ++ toString value' ++ "'")
-                continueF value'
-            else substitute thread (rhs ^?! SL.value) >>= continueF
+        value' <- evaluate thread (rhs ^?! SL.value)
+        debug ("Evaluated rhs '" ++ toString rhs ++ "' to '" ++ toString value' ++ "'")
+        continueF value'
 
 execRhs thread rhs@RhsField{} continueF = do
     ref <- readVar thread (rhs ^?! SL.var ^?! SL.var)
@@ -440,23 +436,15 @@ processRhsFieldCond _ _
 -- | Assume that the given expression holds for the rest of the execution.
 assume :: Thread -> Expression -> Engine r ()
 assume thread assumption0 = do
-    localSolving <- applyLocalSolver <$> askConfig
-    if localSolving
-        then do
-            assumption1 <- evaluateAsBool thread assumption0
-            case assumption1 of
-                Right True  -> return ()
-                Right False -> do
-                    assumptionDebug <- substitute thread assumption0
-                    debug ("Constraint '" ++ toString assumptionDebug ++ "' is infeasible")
-                    infeasible
-                Left assumption2 -> do
-                    debug ("Adding constraint: '" ++ toString assumption2 ++ "'")
-                    modifyLocal (\ state -> state & (constraints %~ H.insert assumption2))
-        else do
-            assumption1 <- substitute thread assumption0
-            debug ("Adding constraint: '" ++ toString assumption1 ++ "'")
-            modifyLocal (\ state -> state & (constraints %~ H.insert assumption1))
+    assumption1 <- evaluateAsBool thread assumption0
+    case assumption1 of
+        Right True  -> return ()
+        Right False -> do
+            debug "Constraint is infeasible"
+            infeasible
+        Left assumption2 -> do
+            debug ("Adding constraint: '" ++ toString assumption2 ++ "'")
+            modifyLocal (\ state -> state & (constraints <>~ PathConstraints.singleton assumption2))
 
 assertM :: Thread -> Maybe Expression -> Engine r ()
 assertM thread = maybe (return ()) (assert thread)
@@ -468,30 +456,21 @@ assert thread assertion = do
     assumptions         <- getConstraints
     config              <- askConfig
     currentProgramTrace <- getProgramTrace
-    let formula0 = ands' (neg' assertion `H.insert` assumptions)
+    let formula0 = PathConstraints.asExpression (PathConstraints.insert (neg' assertion) assumptions)
     debug ("Verifying: '" ++ toString formula0 ++ "'")
-    if applyLocalSolver config
-        then do
-            formula1 <- evaluateAsBool thread formula0
-            case formula1 of
-                Right True -> do
-                    measureLocalSolve
-                    throw (Invalid (getPos assertion) currentProgramTrace)
-                Right False -> do
-                    measureLocalSolve
-                    return ()
-                Left formula2 -> do
-                    aliasMap <- getAliasMap
-                    let verification = verify currentProgramTrace aliasMap (getPos assertion) formula2
-                    if cacheFormulas config 
-                        then underCache formula2 verification
-                        else verification
-        else do
-            formula1 <- substitute thread formula0
+    formula1 <- evaluateAsBool thread formula0
+    case formula1 of
+        Right True -> do
+            measureLocalSolve
+            throw (Invalid (getPos assertion) currentProgramTrace)
+        Right False -> do
+            measureLocalSolve
+            return ()
+        Left formula2 -> do
             aliasMap <- getAliasMap
-            let verification = verify currentProgramTrace aliasMap (getPos assertion) formula1
-            if cacheFormulas config
-                then underCache formula1 verification
+            let verification = verify currentProgramTrace aliasMap (getPos assertion) formula2
+            if cacheFormulas config 
+                then underCache formula2 verification
                 else verification
 
 --------------------------------------------------------------------------------
@@ -518,7 +497,7 @@ concretesOfType thread ty formula = do
     if not (null refs)
         then do
             aliasMap <- getAliasMap
-            let mappings = map (\ ref -> map (ref ^?! SL.var, ) (S.toList (aliasMap M.! (ref ^?! SL.var)))) (S.toList refs)
+            let mappings = map (\ ref -> map (ref ^?! SL.var, ) (S.toList (fromMaybe (error "concretesOfType") (AliasMap.lookup (ref ^?! SL.var) aliasMap)))) (S.toList refs)
             return $ map M.fromList (cartesianProduct mappings)
         else return []
 

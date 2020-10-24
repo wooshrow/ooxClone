@@ -20,7 +20,7 @@ import           Data.Statistics
 import           Data.Configuration
 import           Verification.Result
 import           Analysis.CFA.CFG
-import           Execution.Memory.AliasMap
+import           Execution.State.AliasMap as AliasMap
 import           Language.Syntax
 import           Language.Syntax.Fold
 import qualified Language.Syntax.Lenses    as SL
@@ -31,11 +31,11 @@ import           Language.Syntax.Pretty()
 --------------------------------------------------------------------------------
 
 verifyM  :: (HasConfiguration a, Members [State Statistics, Reader a, Embed IO, Error VerificationResult] r)
-    => [CFGContext] -> M.Map Identifier (S.Set Expression) -> Position -> Maybe Expression -> Sem r ()
+    => [CFGContext] -> AliasMap -> Position -> Maybe Expression -> Sem r ()
 verifyM programTrace aliases pos = maybe (return ()) (verify programTrace aliases pos)
 
 verify :: (HasConfiguration a, Members [State Statistics, Reader a, Embed IO, Error VerificationResult] r)
-    => [CFGContext] -> M.Map Identifier (S.Set Expression) -> Position -> Expression -> Sem r ()
+    => [CFGContext] -> AliasMap -> Position -> Expression -> Sem r ()
 verify programTrace aliases pos = void . verifyEach programTrace pos . concretize aliases
 
 verifyEach :: (HasConfiguration a, Members [State Statistics, Reader a, Embed IO, Error VerificationResult] r)
@@ -58,7 +58,7 @@ concretize :: AliasMap -> Expression -> [Expression]
 concretize aliases formula
     | refs <- findSymbolicRefs formula
     , not (null refs) 
-        = let mappings = map (\ ref -> map (ref ^?! SL.var, ) (maybe (error "concretize") S.toList (aliases M.!? (ref ^?! SL.var)))) (S.toList refs)
+        = let mappings = map (\ ref -> map (ref ^?! SL.var, ) (maybe (error "concretize") S.toList (AliasMap.lookup (ref ^?! SL.var) aliases))) (S.toList refs)
            in map (\ p -> makeConcrete (M.fromList p) formula) (cartesianProduct mappings)
     | otherwise
         = [formula]

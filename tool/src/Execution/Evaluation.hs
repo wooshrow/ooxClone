@@ -18,7 +18,9 @@ import Verification.Result
 import Analysis.CFA.CFG
 import Analysis.SymbolTable
 import Execution.Concurrency.Thread
-import Execution.ExecutionState
+import Execution.State
+import Execution.State.Thread
+import Execution.State.Heap
 import Execution.Memory.Heap
 import Data.Positioned
 import Language.Syntax
@@ -40,7 +42,90 @@ evaluateAsBool thread expression = do
         _                           -> return $ Left result
 
 evaluate :: Thread -> Expression -> Engine r Expression
-evaluate thread0 expression = foldExpression algebra expression thread0
+evaluate thread expression = do
+    applyLocalSolver <- applyLocalSolver <$> askConfig
+    if applyLocalSolver
+        then substitute thread expression
+        else evaluate' thread expression
+
+substitute :: Thread -> Expression -> Engine r Expression
+substitute thread0 expression = foldExpression substitutionAlgebra expression thread0
+    where
+        substitutionAlgebra :: Members [ Reader (Configuration, ControlFlowGraph, SymbolTable)
+            , Error VerificationResult
+            , Cache Expression
+            , LocalState ExecutionState
+            , State Statistics
+            , Embed IO] r => ExpressionAlgebra (Thread -> Sem r Expression)
+        substitutionAlgebra = ExpressionAlgebra
+            { fForall = substituteQuantifier ands'
+
+            , fExists = substituteQuantifier ors'
+            
+            , fBinOp = \ binOp lhs0 rhs0 ty pos thread -> do
+                lhs1 <- lhs0 thread
+                rhs1 <- rhs0 thread
+                return (BinOp binOp lhs1 rhs1 ty pos)
+                
+            , fUnOp = \ unOp expr0 ty pos thread -> do
+                expr1 <- expr0 thread
+                return (UnOp unOp expr1 ty pos)
+                
+            , fVar = \ var _ _ thread -> do
+                value <- readVar thread var
+                case value of
+                    SymbolicRef{} -> initializeSymbolicRef value
+                    _             -> return ()
+                return value
+                
+            , fSymVar = \ var ty pos _ ->
+                return (SymbolicVar var ty pos)
+                
+            , fLit = \ lit ty pos _ -> 
+                return (Lit lit ty pos)
+                
+            , fSizeOf = \ var _ _ thread -> do
+                ref <- readVar thread var
+                processRef ref
+                    (fmap (lit' . intLit') . arraySize)
+                    (error "substitute: SizeOf of Symbolic Reference")
+                    infeasible
+                    
+            , fRef = \ ref ty pos _ ->
+                return (Ref ref ty pos)
+                
+            , fSymRef = \ var ty pos _ -> do
+                let ref = SymbolicRef var ty pos
+                initializeSymbolicRef ref
+                return ref
+                
+            , fCond = \ guard0 true0 false0 ty pos thread -> do
+                guard1 <- guard0 thread
+                true1  <- true0 thread
+                false1 <- false0 thread
+                return (Conditional guard1 true1 false1 ty pos) }
+
+substituteQuantifier :: ([Expression] -> Expression) -> Identifier -> Identifier -> Identifier -> (Thread -> Engine r Expression) -> RuntimeType -> Position -> Thread -> Engine r Expression
+substituteQuantifier quantifier element range domain formula _ _ thread0 = do
+    ref <- readVar thread0 domain
+    processRef ref
+        (\ concRef -> do
+            structure <- dereference concRef
+            let (ArrayValue values) = structure
+            formulas <- mapM (\ (value, index) -> do
+                state <- getLocal
+                thread1 <- writeVar thread0 element value
+                thread2 <- writeVar thread1 range index
+                f <- substitute thread2 =<< formula thread2
+                putLocal state
+                return f
+                ) ((zip values . map (lit' . intLit')) [0..])
+            return $ quantifier formulas)
+        (const (throw (InternalError "substituteQuantifier: Symbolic Reference")))
+        infeasible
+
+evaluate' :: Thread -> Expression -> Engine r Expression
+evaluate' thread0 expression = foldExpression algebra expression thread0
     where
         algebra :: Members [ Reader (Configuration, ControlFlowGraph, SymbolTable)
                            , Error VerificationResult

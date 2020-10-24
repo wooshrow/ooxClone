@@ -30,11 +30,14 @@ executable app
                           , Execution.Phase
                           , Execution.Engine
                           , Execution.Memory.Heap
-                          , Execution.Memory.AliasMap
-                          , Execution.ExecutionState
+                          , Execution.State
+                          , Execution.State.PathConstraints
+                          , Execution.State.LockSet
+                          , Execution.State.Thread
+                          , Execution.State.AliasMap
+                          , Execution.State.Heap
                           , Execution.Concurrency.Thread
                           , Execution.Concurrency.POR
-                          , Execution.Concurrency.Lock
                           , Execution.Evaluation
                           , Verification.Result
                           , Verification.Verifier
