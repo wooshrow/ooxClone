@@ -12,7 +12,8 @@ import           Language.Syntax
 import           Analysis.Type.Typeable
 
 newtype Heap = Heap { unHeap :: M.Map Reference HeapValue }
-
+    deriving (Show)
+    
 instance Semigroup Heap where
     (Heap a) <> (Heap b) = Heap (a <> b)
 

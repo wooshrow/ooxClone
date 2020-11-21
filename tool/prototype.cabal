@@ -29,16 +29,22 @@ executable app
                           , Analysis.CFA.Analysis
                           , Execution.Phase
                           , Execution.Engine
-                          , Execution.Memory.Heap
+                          , Execution.Semantics
+                          , Execution.Semantics.Concretization
+                          , Execution.Semantics.StackFrame
+                          , Execution.Semantics.Exception
+                          , Execution.Semantics.Heap
+                          , Execution.Semantics.Process
+                          , Execution.Semantics.Thread
+                          , Execution.Semantics.Evaluation
+                          , Execution.Semantics.PartialOrderReduction
                           , Execution.State
                           , Execution.State.PathConstraints
                           , Execution.State.LockSet
                           , Execution.State.Thread
                           , Execution.State.AliasMap
                           , Execution.State.Heap
-                          , Execution.Concurrency.Thread
-                          , Execution.Concurrency.POR
-                          , Execution.Evaluation
+                          , Execution.State.InterleavingConstraints
                           , Verification.Result
                           , Verification.Verifier
                           , Data.Positioned
@@ -48,7 +54,6 @@ executable app
                           , Data.Stack
                           , Text.Pretty
                           , Polysemy.Cache
-                          , Polysemy.LocalState
                           , Control.Monad.Extra
     main-is:                Main.hs
     build-depends:          base                 ^>=4.12.0.0

@@ -1,0 +1,14 @@
+class Main
+{
+    static void main(Number[] xs)
+    {
+        Number x := xs[0];
+        int y := x.x;
+        assert y == 1;
+    }
+}
+
+class Number
+{
+    int x;
+}

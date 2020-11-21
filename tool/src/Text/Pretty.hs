@@ -7,10 +7,11 @@ module Text.Pretty(
     , commas
 ) where
 
-import           Prelude          hiding ((<>))
+import           Prelude hiding ((<>))
 import           Text.PrettyPrint
-import qualified Data.Set         as S 
-import           Data.List             (intersperse)
+import qualified Data.Set as S 
+import qualified Data.Map as M
+import           Data.List (intersperse)
 
 class Pretty a where
     pretty   :: a -> Doc
@@ -22,7 +23,7 @@ class Pretty a where
 instance Pretty Doc where
     pretty = id
 
-instance Pretty String where
+instance {-# OVERLAPPING #-} Pretty String where
     pretty = text
 
 instance Pretty Int where
@@ -35,7 +36,15 @@ instance Pretty a => Pretty (Maybe a) where
     pretty = maybe (text "Nothing") pretty
 
 instance Pretty a => Pretty (S.Set a) where
-    pretty set = lbrace <> commas (S.toList set) <> rbrace
+    pretty = braces . commas . S.toList
+
+instance {-# OVERLAPPABLE #-} Pretty a => Pretty [a] where
+    pretty = brackets . commas
+
+instance (Pretty k, Pretty v) => Pretty (M.Map k v) where
+    pretty = brackets . commas . map prettyElem . M.toList
+        where
+            prettyElem (k, v) = pretty k <> pretty "->" <> pretty v
 
 dot :: Doc
 dot = char '.'

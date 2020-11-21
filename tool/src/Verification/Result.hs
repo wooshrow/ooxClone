@@ -30,4 +30,4 @@ instance Pretty VerificationResult where
     pretty (Unknown pos _)         = text "UNKNOWN assertion" <+> pretty pos
     pretty (Deadlock _)            = text "DEADLOCK"
     pretty Infeasible              = text "INFEASIBLE"
-    pretty (InternalError message) = text "INTERNAL ERROR '" <+> pretty message <+> text "'"
+    pretty (InternalError message) = text "INTERNAL ERROR '" <> pretty message <> text "'"

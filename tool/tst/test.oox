@@ -1,27 +1,18 @@
 class Main
 {
-    static void main()
+    static void main(int x, int y)
     {
-        Number a := new Number(1);
-        Number b := new Number(2);
-        int r := x.Add(b);
-        assert r == 3;
+        Main.f();
+        assert false;
+    }
+
+    static void f()
+    {
+        assert false;
     }
 }
 
 class Number
 {
-    int value;
-
-    Number(int value)
-    {
-        this.value := value;
-    }
-
-    int Add(Number that)
-    {
-        int x := this.value;
-        int y := that.value;
-        return x + y;
-    }
+    int x;
 }

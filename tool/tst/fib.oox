@@ -2,8 +2,8 @@ class Main
 {
     static void main()
     {
-        int x := Main.fib(7);
-        assert x == 13;
+        int x := Main.fib(8);
+        assert x == 2;
     }
 
     static int fib(int n)

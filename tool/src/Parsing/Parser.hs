@@ -43,10 +43,8 @@ pClassDeclaration = do
     return $ Class name members pos
     
 pMember :: Identifier -> P DeclarationMember
-pMember className = choice [ try (pMethod className) <?> "a method"
-                           , try (pConstructor className) <?> "a constructor"
-                           , pField <?> "a field" ]
-
+pMember className = choice [pField, pMethod className, pConstructor className]
+            
 pConstructor :: Identifier -> P DeclarationMember
 pConstructor className = do
     pos <- getPosition
@@ -54,8 +52,8 @@ pConstructor className = do
     when (name /= className)
         (parserFail "Constructor identifier does not match class identifier")
     params <- pBetweenParens pParameters
-    specification <- pSpecification
-    body <- pBetweenCurly pStatements
+    specification <- pSpecification <?> "a specification"
+    body <- pBetweenCurly pStatements <?> "a statement block"
     let body' = Seq body (Return Nothing unknownLabel unknownPos) unknownLabel unknownPos
     return $ Constructor name params specification body' (unknownLabel, unknownLabel) pos
 
@@ -64,12 +62,12 @@ pMethod className = do
     pos <- getPosition
     isStatic <- option False (True <$ pToken TStatic)
     ty <- pType
-    name <- pIdentifier
+    name <- try pIdentifier
     when (name == className)
         (parserFail "Method name can not match class name")
     params <- pBetweenParens pParameters
-    specification <- pSpecification
-    body <- pBetweenCurly pStatements
+    specification <- pSpecification <?> "a specification"
+    body <- pBetweenCurly pStatements <?> "a statement block"
     return $ Method isStatic ty name params specification body (unknownLabel, unknownLabel) pos
 
 pField :: P DeclarationMember
@@ -81,13 +79,13 @@ pField = do
     return $ Field ty name pos
 
 pParameters :: P [Parameter]
-pParameters = pParameter `sepBy` pComma
+pParameters = (pParameter `sepBy` pComma) <?> "zero or more parameters"
 
 pParameter :: P Parameter
 pParameter = do
     pos  <- getPosition
     ty   <- pNonVoidType
-    name <- pIdentifier
+    name <- pIdentifier <?> "an identifier"
     return $ Parameter ty name pos
 
 pSpecification :: P Specification

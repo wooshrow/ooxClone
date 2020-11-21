@@ -8,6 +8,8 @@ module Analysis.CFA.CFG(
     , CFGNodeValue(..)
     , CFGEdge
     , CFGAdj
+    , Node
+    , context
 ) where
 
 import           Data.Graph.Inductive.Graph

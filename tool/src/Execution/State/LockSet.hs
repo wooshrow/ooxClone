@@ -12,28 +12,13 @@ import           Execution.State.Thread (ThreadId)
 import           Language.Syntax
 
 newtype LockSet = LockSet { unLockSet :: M.Map Reference ThreadId }
+    deriving (Show)
 
 instance Semigroup LockSet where
     (LockSet a) <> (LockSet b) = LockSet (a <> b)
 
 instance Monoid LockSet where
     mempty = LockSet M.empty
-
-{-
-locked :: Int -> Reference -> Engine r Bool
-locked tid ref = do
-    lockSet <- getLocks
-    case lockSet M.!? ref of
-        Nothing   -> return False
-        Just lTid -> return (tid /= lTid)
-
-
-lock :: Int -> Reference -> Engine r ()
-lock tid ref = modifyLocal (\ state -> state & locks %~ M.insert ref tid)
-
-unlock :: Reference -> Engine r ()
-unlock ref = modifyLocal (\ state -> state & locks %~ M.delete ref)
--}
 
 singleton :: Reference -> ThreadId -> LockSet
 singleton ref = LockSet . M.singleton ref

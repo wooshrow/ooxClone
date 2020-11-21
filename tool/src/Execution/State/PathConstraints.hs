@@ -10,7 +10,8 @@ import           Language.Syntax.DSL
 import           Language.Syntax          (Expression)
 
 newtype PathConstraints = PathConstraints { unPathConstraints :: H.HashSet Expression }
-
+    deriving (Show)
+    
 instance Semigroup PathConstraints where
     (PathConstraints a) <> (PathConstraints b) = PathConstraints (a <> b)
 

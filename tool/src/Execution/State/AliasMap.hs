@@ -5,16 +5,18 @@ module Execution.State.AliasMap(
     , elems
     , insert
     , filter
-    , Concretization
+    , otherAliasesOfType
 ) where
     
 import           Prelude hiding (lookup, filter)
-import qualified Data.Map        as M
-import qualified Data.Set        as S
+import qualified Data.Map as M
+import qualified Data.Set as S
+import           Analysis.Type.Typeable
 import           Language.Syntax
 
 newtype AliasMap = AliasMap { unAliasMap :: M.Map Identifier (S.Set Expression) }
-
+    deriving (Show)
+    
 instance Semigroup AliasMap where
     (AliasMap a) <> (AliasMap b) = AliasMap (a <> b)
 
@@ -36,4 +38,5 @@ insert var concretes = AliasMap . M.insert var concretes . unAliasMap
 filter :: (S.Set Expression -> Bool) -> AliasMap -> AliasMap
 filter f = AliasMap . M.filter f . unAliasMap
 
-type Concretization = M.Map Identifier Expression
+otherAliasesOfType :: RuntimeType -> AliasMap -> S.Set Expression
+otherAliasesOfType ty = S.unions . elems . filter (any (`isOfType` ty))

@@ -1,7 +1,6 @@
 module Verification.Verifier(
       verifyM
     , verify
-    , cartesianProduct
 ) where
 
 import qualified Data.Map                   as M
@@ -26,6 +25,8 @@ import           Language.Syntax.Fold
 import qualified Language.Syntax.Lenses    as SL
 import           Language.Syntax.Pretty()
 
+type Concretization = M.Map Identifier Expression
+
 --------------------------------------------------------------------------------
 -- Verification Interface
 --------------------------------------------------------------------------------
@@ -44,7 +45,7 @@ verifyEach _            _   []     = return Unsat
 verifyEach programTrace pos (n:ns) = do
     debug ("Verifying: " ++ toString n)
     measureInvokeZ3
-    result <- (embed . evalZ3 . verifyZ3) n
+    (result, _) <- (embed . evalZ3 . verifyZ3) n
     case result of
         Unsat -> verifyEach programTrace pos ns
         Sat   -> throw $ Invalid pos programTrace
@@ -59,7 +60,7 @@ concretize aliases formula
     | refs <- findSymbolicRefs formula
     , not (null refs) 
         = let mappings = map (\ ref -> map (ref ^?! SL.var, ) (maybe (error "concretize") S.toList (AliasMap.lookup (ref ^?! SL.var) aliases))) (S.toList refs)
-           in map (\ p -> makeConcrete (M.fromList p) formula) (cartesianProduct mappings)
+           in map (\ p -> makeConcrete (M.fromList p) formula) (sequence mappings)
     | otherwise
         = [formula]
 
@@ -75,8 +76,8 @@ findSymbolicRefs = foldExpression algebra
         algebra = monoidExpressionAlgebra
             { fSymRef = \ symVar varTy varPos -> S.singleton (SymbolicRef symVar varTy varPos) }
 
-verifyZ3 :: Expression -> Z3 Result
-verifyZ3 formula= (assert =<< construct formula) >> check
+verifyZ3 :: Expression -> Z3 (Result, Maybe Model)
+verifyZ3 formula = (assert =<< construct formula) >> solverCheckAndGetModel
 
 construct :: Expression -> Z3 AST
 construct e@BinOp{} = do
@@ -128,11 +129,3 @@ runtimeTypeToSort ty = case ty of
         elemSort <- runtimeTypeToSort innerTy
         mkArraySort elemSort =<< mkIntSort
     _                  -> error "non-concrete or non-implemented type."
-
---------------------------------------------------------------------------------
--- Auxiliary functions
---------------------------------------------------------------------------------
-
-cartesianProduct :: [[a]] -> [[a]]
-cartesianProduct = foldr f [[]]
-    where f l a = [ x:xs | x <- l, xs <- a ]

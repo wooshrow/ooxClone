@@ -15,6 +15,7 @@ import           Language.Syntax
 import qualified Language.Syntax.Lenses       as SL
 import           Language.Syntax.Fold
 
+{-
 type InterleavingConstraints = [InterleavingConstraint]
 
 data InterleavingConstraint
@@ -32,7 +33,8 @@ instance Pretty InterleavingConstraint where
         = pretty v <> text "!~" <> pretty w
 
 type ReadWriteSet = (S.Set Reference, S.Set Reference)
-
+-}
+{-
 -- | Returns the Set of Threads that must be interleaved.
 por :: [Thread] -> Engine r InterleavingConstraints
 por [_]     = return []
@@ -110,3 +112,4 @@ getReferences thread var = do
             aliases <- fromJust <$> getAliasesWithoutNull symRef
             return $ S.map (^?! SL.ref) aliases)
         (return S.empty)
+-}
