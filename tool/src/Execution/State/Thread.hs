@@ -38,7 +38,10 @@ data StackFrame = StackFrame
 $(makeLenses ''StackFrame)
 
 instance Pretty.Pretty StackFrame where
-    pretty frame = Pretty.pretty (frame ^. declarations)
+    pretty frame = 
+        Pretty.text "returnPoint="  <> Pretty.pretty (frame ^. returnPoint)  Pretty.$+$
+        Pretty.text "lhs="          <> Pretty.pretty (frame ^. lhs)          Pretty.$+$
+        Pretty.text "declarations=" <> Pretty.pretty (frame ^. declarations)
 
 data Thread = Thread 
     { _tid          :: ThreadId
@@ -46,6 +49,7 @@ data Thread = Thread
     , _pc           :: CFGContext
     , _callStack    :: T.Stack StackFrame
     , _handlerStack :: T.Stack (Node, Int) }
+    deriving (Show)
 
 $(makeLenses ''Thread)
 
@@ -56,4 +60,9 @@ instance Ord Thread where
     t1 <= t2 = t1 ^. tid <= t2 ^. tid
 
 instance Pretty.Pretty Thread where
-    pretty thread = Pretty.pretty (thread ^. tid)
+    pretty thread = 
+        Pretty.text "tid="       <> Pretty.pretty (thread ^. tid)       Pretty.$+$
+        Pretty.text "parent="    <> Pretty.pretty (thread ^. parent)    Pretty.$+$
+        Pretty.text "pc="        <> Pretty.pretty (thread ^. pc)        Pretty.$+$
+        Pretty.text "parent="    <> Pretty.pretty (thread ^. parent)    Pretty.$+$
+        Pretty.text "callstack=" <> Pretty.pretty (thread ^. callStack)

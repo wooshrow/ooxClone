@@ -8,6 +8,7 @@ module Execution.State.Heap(
 
 import           Prelude                     hiding (lookup)
 import qualified Data.Map               as M
+import qualified Text.Pretty as Pretty
 import           Language.Syntax
 import           Analysis.Type.Typeable
 
@@ -20,6 +21,9 @@ instance Semigroup Heap where
 instance Monoid Heap where
     mempty = Heap M.empty
 
+instance Pretty.Pretty Heap where
+    pretty = Pretty.pretty . unHeap
+
 data HeapValue 
     = ObjectValue (M.Map Identifier Expression) RuntimeType
     | ArrayValue  [Expression]
@@ -28,6 +32,10 @@ data HeapValue
 instance Typeable HeapValue where
     typeOf (ObjectValue _ ty) = ty
     typeOf (ArrayValue es)    = typeOf $ head es
+
+instance Pretty.Pretty HeapValue where
+    pretty (ObjectValue fields _) = Pretty.pretty fields
+    pretty (ArrayValue values)    = Pretty.pretty values
 
 lookup :: Reference -> Heap -> Maybe HeapValue
 lookup ref = M.lookup ref . unHeap

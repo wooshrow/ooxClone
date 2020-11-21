@@ -1,12 +1,13 @@
 module Data.Stack where
 
 newtype Stack a = Stack { unStack :: [a] }
+    deriving (Show)
 
 instance Functor Stack where
-    fmap f Stack{unStack} = Stack $ map f unStack
+    fmap f = Stack . fmap f . unStack
 
 singleton :: a -> Stack a
-singleton x = Stack [x]
+singleton = Stack . pure
 
 empty :: Stack a
 empty = Stack []
@@ -25,10 +26,10 @@ peekUnsafe stack
     | otherwise                = error "peekUnsafe: empty stack"
 
 pop :: Stack a -> Stack a
-pop Stack{unStack} = Stack $ tail unStack
+pop = Stack . tail . unStack
 
 size :: Stack a -> Int
-size Stack{unStack} = length unStack
+size = length . unStack
 
 null :: Stack a -> Bool
 null stack = size stack > 0 
@@ -37,3 +38,6 @@ updateTop :: a -> Stack a -> Stack a
 updateTop new Stack{unStack}
     | (_:xs) <- unStack = Stack (new:xs)
     | otherwise         = error "cannot update an empty stack."
+
+toList :: Stack a -> [a]
+toList = unStack

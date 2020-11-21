@@ -25,7 +25,8 @@ spawn state0 parent entry member arguments = do
     let thread     = Thread tid parent pc T.empty T.empty
     let state1     = updateThreadInState state0 thread
     let parameters = member ^?! SL.params
-    (,tid) <$> pushStackFrame state1 tid entry member Nothing (zip parameters arguments)
+    state1 <- pushStackFrame state1 tid entry member Nothing (zip parameters arguments)
+    return (state1 & (numberOfForks +~ 1), tid)
 
 despawnCurrentThread :: ExecutionState -> Engine r ExecutionState
 despawnCurrentThread state0

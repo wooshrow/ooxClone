@@ -5,9 +5,10 @@ module Execution.State.PathConstraints(
     , asExpression
 ) where
 
-import qualified Data.HashSet        as H 
+import qualified Data.HashSet as H 
+import qualified Text.Pretty as Pretty
 import           Language.Syntax.DSL
-import           Language.Syntax          (Expression)
+import           Language.Syntax (Expression)
 
 newtype PathConstraints = PathConstraints { unPathConstraints :: H.HashSet Expression }
     deriving (Show)
@@ -17,6 +18,9 @@ instance Semigroup PathConstraints where
 
 instance Monoid PathConstraints where
     mempty = PathConstraints mempty
+
+instance Pretty.Pretty PathConstraints where
+    pretty = Pretty.pretty . unPathConstraints
 
 singleton :: Expression -> PathConstraints
 singleton = PathConstraints . H.singleton

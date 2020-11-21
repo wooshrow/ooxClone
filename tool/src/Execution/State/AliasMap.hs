@@ -11,6 +11,7 @@ module Execution.State.AliasMap(
 import           Prelude hiding (lookup, filter)
 import qualified Data.Map as M
 import qualified Data.Set as S
+import qualified Text.Pretty as Pretty
 import           Analysis.Type.Typeable
 import           Language.Syntax
 
@@ -22,6 +23,9 @@ instance Semigroup AliasMap where
 
 instance Monoid AliasMap where
     mempty = AliasMap M.empty
+
+instance Pretty.Pretty AliasMap where
+    pretty = Pretty.pretty . unAliasMap
 
 lookup :: Identifier -> AliasMap -> Maybe (S.Set Expression)
 lookup var = M.lookup var . unAliasMap

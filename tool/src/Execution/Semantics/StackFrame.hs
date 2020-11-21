@@ -19,9 +19,9 @@ writeDeclaration state var value
                 let thread1  = thread0 & (callStack %~ T.updateTop newFrame)
                 return $ updateThreadInState state thread1
             Nothing       -> 
-                throw (InternalError "writeDeclaration: no stack frame")
+                stop state "writeDeclaration: no stack frame"
     | otherwise = 
-        throw (InternalError "writeDeclaration: cannot get current thread")
+        stop state "writeDeclaration: cannot get current thread"
 
 writeDeclarationOnFrame :: StackFrame -> Identifier -> Expression -> StackFrame
 writeDeclarationOnFrame frame var value = frame & (declarations %~ M.insert var value)
@@ -32,16 +32,16 @@ readDeclaration state var
         case getLastStackFrame thread of
             Just frame -> do
                 let value = (frame ^. declarations) M.!? var
-                maybe (throw (InternalError (readDeclarationErrorMessage var frame))) return value
+                maybe (stop state (readDeclarationErrorMessage var)) return value
             Nothing    ->
-                throw (InternalError "readDeclaration: no stack frame")
+                stop state "readDeclaration: no stack frame"
     | otherwise = 
-        throw (InternalError "readDeclaration: cannot get current thread")
+        stop state "readDeclaration: cannot get current thread"
 
 getLastStackFrame :: Thread -> Maybe StackFrame
 getLastStackFrame thread = T.peek (thread ^. callStack)
 
-readDeclarationErrorMessage :: Identifier -> StackFrame -> String
-readDeclarationErrorMessage (Identifier var pos) frame =
+readDeclarationErrorMessage :: Identifier -> String
+readDeclarationErrorMessage (Identifier var pos) =
     "readDeclaration: failed to read variable '" ++ var ++ "' declared at " ++
-    "'" ++ toString pos ++ "' with stack frame " ++ toString frame
+    "'" ++ toString pos

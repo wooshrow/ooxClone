@@ -1,5 +1,6 @@
 module Execution.State where
     
+import           Prelude hiding ((<>))
 import qualified Data.Set                 as S
 import           Data.Foldable
 import           Control.Lens
@@ -8,9 +9,10 @@ import           Polysemy.Reader
 import           Polysemy.Error 
 import           Polysemy.State
 import           Polysemy.Cache
+import           Text.Pretty
 import           Execution.State.PathConstraints
 import           Execution.State.LockSet
-import           Execution.State.Thread
+import Execution.State.Thread ( tid, Thread, ThreadId )
 import           Execution.State.AliasMap
 import           Execution.State.Heap
 import           Execution.State.InterleavingConstraints
@@ -33,10 +35,19 @@ data ExecutionState = ExecutionState
     , _numberOfForks           :: !Int
     , _interleavingConstraints :: !InterleavingConstraints
     , _programTrace            :: ![CFGContext]
-    , _remainingK              :: !Int 
-    }
+    , _remainingK              :: !Int }
+    deriving (Show)
 
 $(makeLenses ''ExecutionState)
+
+instance Pretty ExecutionState where
+    pretty state =
+        text "threads="     <> pretty (state ^. threads)         $+$
+        text "tid="         <> pretty (state ^. currentThreadId) $+$
+        text "constraints=" <> pretty (state ^. constraints)     $+$
+        text "heap="        <> pretty (state ^. heap)            $+$
+        text "aliases="     <> pretty (state ^. aliasMap)        $+$
+        text "locks="       <> pretty (state ^. locks)
 
 emptyState :: ExecutionState
 emptyState = ExecutionState { _threads                 = mempty
@@ -74,6 +85,10 @@ defaultValue ty = lit' $
 
 infeasible :: Engine r a
 infeasible = measurePrune >> throw Infeasible
+
+stop :: ExecutionState -> String -> Engine r a
+stop state message = do
+    throw (InternalError (message ++ " with state: \n" ++ toString state))
 
 finish :: Engine r ()
 finish = measureFinish

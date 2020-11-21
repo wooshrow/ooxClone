@@ -1,18 +1,15 @@
 class Main
 {
-    static void main(int x, int y)
+    static void main()
     {
-        Main.f();
-        assert false;
+        int x := 0;
+        fork Main.f(x);
+        ;;;;;
+        assert x == x;
     }
 
-    static void f()
+    static void f(int x)
     {
-        assert false;
+        assert x == 0;
     }
-}
-
-class Number
-{
-    int x;
 }

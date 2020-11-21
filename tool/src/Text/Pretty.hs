@@ -11,6 +11,8 @@ import           Prelude hiding ((<>))
 import           Text.PrettyPrint
 import qualified Data.Set as S 
 import qualified Data.Map as M
+import qualified Data.Stack as T
+import qualified Data.HashSet as H
 import           Data.List (intersperse)
 
 class Pretty a where
@@ -37,6 +39,12 @@ instance Pretty a => Pretty (Maybe a) where
 
 instance Pretty a => Pretty (S.Set a) where
     pretty = braces . commas . S.toList
+    
+instance Pretty a => Pretty (T.Stack a) where
+    pretty = brackets . commas . T.toList
+
+instance Pretty a => Pretty (H.HashSet a) where
+    pretty = braces . commas . H.toList
 
 instance {-# OVERLAPPABLE #-} Pretty a => Pretty [a] where
     pretty = brackets . commas

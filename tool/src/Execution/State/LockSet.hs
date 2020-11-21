@@ -6,8 +6,9 @@ module Execution.State.LockSet(
     , lookup
 ) where
 
-import           Prelude              hiding (lookup)
-import qualified Data.Map        as M
+import           Prelude hiding (lookup)
+import qualified Data.Map as M
+import qualified Text.Pretty as Pretty
 import           Execution.State.Thread (ThreadId)
 import           Language.Syntax
 
@@ -19,6 +20,9 @@ instance Semigroup LockSet where
 
 instance Monoid LockSet where
     mempty = LockSet M.empty
+
+instance Pretty.Pretty LockSet where
+    pretty = Pretty.pretty . unLockSet
 
 singleton :: Reference -> ThreadId -> LockSet
 singleton ref = LockSet . M.singleton ref

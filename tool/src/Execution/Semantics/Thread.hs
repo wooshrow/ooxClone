@@ -6,7 +6,6 @@ import           Control.Monad
 import           Polysemy.Error
 import           Control.Lens hiding (assign)
 import           Analysis.CFA.CFG
-import           Analysis.Type.Typeable
 import           Execution.Semantics.StackFrame
 import           Execution.Semantics.Exception
 import           Execution.Semantics.Evaluation

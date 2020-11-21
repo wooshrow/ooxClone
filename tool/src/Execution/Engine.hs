@@ -72,20 +72,19 @@ start state0 initialMethod = do
 execP :: ExecutionState -> Engine r ()
 execP state0 = do
     let allThreads = state0 ^. threads
-    debug ("Branching on threads '" ++ toString allThreads ++ "'")
     if null allThreads 
         then finish
         else do
-            --applyPOR                <- applyPOR <$> askConfig
             enabledThreads <- filterM (isEnabled state0) (S.toList allThreads)
             when (null enabledThreads) 
                 (throw $ Deadlock (state0 ^. programTrace))
             (state1, threads) <- por state0 enabledThreads
-            randomExploration <- applyRandomInterleaving <$> askConfig
-            if randomExploration
-                then branch_ (\ thread -> execT (state1 & (currentThreadId ?~ (thread ^. tid))) (thread ^. pc)) threads
+            config <- askConfig
+            if applyRandomInterleaving config
+                then 
+                    branch_ (\ thread -> execT (state1 & (currentThreadId ?~ (thread ^. tid))) (thread ^. pc)) threads
                 else do
-                    shuffledThreads <- embed (shuffleM enabledThreads)
+                    shuffledThreads <- embed (shuffleM threads)
                     branch_ (\ thread -> execT (state1 & (currentThreadId ?~ (thread ^. tid))) (thread ^. pc)) shuffledThreads
 
             {-if applyPOR
@@ -106,7 +105,6 @@ execP state0 = do
             -}
 -- branch_ (\ thread -> execT (state & (currentThreadId ?~ (thread ^. tid))) (thread ^. pc)) allThreads
 
--- TODO: in the above function, for each branch_ call set the ThreadId
 {-
 isUniqueInterleaving :: Thread -> Engine r Bool
 isUniqueInterleaving thread = do
