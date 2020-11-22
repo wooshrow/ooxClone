@@ -32,7 +32,7 @@ size :: Stack a -> Int
 size = length . unStack
 
 null :: Stack a -> Bool
-null stack = size stack > 0 
+null = Prelude.null . unStack
 
 updateTop :: a -> Stack a -> Stack a
 updateTop new Stack{unStack}
