@@ -80,8 +80,7 @@ data CFGNodeValue
         RuntimeType 
         Identifier
         Identifier
-        [RuntimeType] 
-        (Maybe Expression)
+        [RuntimeType]
     | ExceptionalNode 
     | TryEntry Node
     | TryExit
@@ -142,7 +141,7 @@ instance P.Pretty CFGNodeValue where
             pName   = P.pretty className P.<> P.dot P.<> P.pretty methodName
             pParams = P.parens (P.commas params)
 
-    pretty (MemberExit retType className methodName params _)  
+    pretty (MemberExit retType className methodName params)  
         = P.text "exit of" P.<+> P.quotes pMethod
         where
             pMethod = P.pretty retType P.<+> pName P.<> pParams

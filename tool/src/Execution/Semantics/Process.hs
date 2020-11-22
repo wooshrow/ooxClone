@@ -6,7 +6,6 @@ module Execution.Semantics.Process(
 
 import qualified Data.Stack as T
 import qualified Data.Set as S
-import           Polysemy.Error
 import           Analysis.CFA.CFG
 import           Control.Lens hiding (assign)
 import           Data.Configuration
@@ -15,7 +14,6 @@ import           Execution.State
 import           Execution.State.Thread
 import           Language.Syntax
 import qualified Language.Syntax.Lenses as SL
-import           Verification.Result
 
 spawn :: ExecutionState -> ThreadId -> Node -> DeclarationMember -> [Expression] -> Engine r (ExecutionState, ThreadId)
 spawn state0 parent entry member arguments = do
@@ -34,7 +32,7 @@ despawnCurrentThread state0
         state1 <- despawn state0 thread
         return $ state1 & (currentThreadId .~ Nothing)
     | otherwise =
-        throw (InternalError "despawnCurrentThread: cannot get current thread")
+        stop state0 "despawnCurrentThread: cannot get current thread"
 
 despawn :: ExecutionState -> Thread -> Engine r ExecutionState
 despawn state thread = do

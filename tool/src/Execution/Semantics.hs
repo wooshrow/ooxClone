@@ -64,7 +64,7 @@ execAssert state0 assertion = do
         (state3, formula1) <- evaluateAsBool state2 formula0
         case formula1 of
             Right True -> do
-                throw (Invalid (getPos assertion) currentProgramTrace)
+                invalid state3 assertion
             Right False -> do
                 return state3
             Left formula2 -> do
@@ -73,6 +73,51 @@ execAssert state0 assertion = do
                     then underCache formula2 verification
                     else verification
                 return state3
+
+execAssertEnsures :: ExecutionState -> Engine r [ExecutionState]
+execAssertEnsures state = do
+    config <- askConfig
+    if verifyRequires config
+        then
+            case getCurrentThread state of
+                Just thread -> do
+                    let frame   = fromJust (getLastStackFrame thread)
+                    let ensures = frame ^. currentMember ^?! SL.specification ^?! SL.ensures
+                    maybe (return [state]) (execAssert state) ensures
+                Nothing     ->
+                    stop state "execAssertEnsures: cannot get current thread"
+        else 
+            return [state]
+
+execAssertRequires :: ExecutionState -> Engine r [ExecutionState]
+execAssertRequires state = do
+    config <- askConfig
+    if verifyRequires config
+        then
+            case getCurrentThread state of
+                Just thread -> do
+                    let frame    = fromJust (getLastStackFrame thread)
+                    let requires = frame ^. currentMember ^?! SL.specification ^?! SL.requires
+                    maybe (return [state]) (execAssert state) requires
+                Nothing     ->
+                    stop state "execAssertRequires: cannot get current thread"
+        else 
+            return [state]
+
+execAssertExceptional :: ExecutionState -> Engine r [ExecutionState]
+execAssertExceptional state = do
+    config <- askConfig
+    if verifyExceptional config
+        then
+            case getCurrentThread state of
+                Just thread -> do
+                    let frame       = fromJust (getLastStackFrame thread)
+                    let exceptional = frame ^. currentMember ^?! SL.specification ^?! SL.exceptional
+                    maybe (return [state]) (execAssert state) exceptional
+                Nothing     ->
+                    stop state "execAssertExceptional: cannot get current thread"
+        else
+            return [state]
 
 execAssume :: ExecutionState -> Expression -> Engine r [ExecutionState]
 execAssume state0 assumption0 = do
@@ -90,12 +135,12 @@ execAssume state0 assumption0 = do
                 return $ state3 & (constraints <>~ PathConstraints.singleton assumption2)
 
 execCall :: ExecutionState -> DeclarationMember -> [Expression] -> Maybe Lhs -> Node -> Maybe (NonVoidType, Identifier) -> Engine r ExecutionState
-execCall state0 method arguments lhs neighbour thisInfo = do
+execCall state method arguments lhs neighbour thisInfo = do
     -- Construct the parameters and arguments.
     let parameters = [Parameter (fst (fromJust thisInfo)) this' unknownPos | isJust thisInfo] ++ method ^?! SL.params
     let arguments' = [var' (snd (fromJust thisInfo)) (typeOf (fst (fromJust thisInfo))) | isJust thisInfo] ++ arguments
     -- Push a new stack frame.
-    pushStackFrameOnCurrentThread state0 neighbour method lhs (zip parameters arguments')
+    pushStackFrameOnCurrentThread state neighbour method lhs (zip parameters arguments')
 
 execNewObject :: ExecutionState -> DeclarationMember -> [Expression] -> Maybe Lhs -> Node -> Engine r ExecutionState
 execNewObject state0 constructor arguments lhs neighbour  = do
@@ -110,40 +155,24 @@ execNewObject state0 constructor arguments lhs neighbour  = do
     -- Push a new stack frame.
     pushStackFrameOnCurrentThread state1 neighbour constructor lhs (zip parameters arguments')
 
-execFork :: ExecutionState -> Node -> DeclarationMember -> [Expression] -> Engine r ExecutionState
+execFork :: ExecutionState -> Node -> DeclarationMember -> [Expression] -> Engine r (ExecutionState, ThreadId)
 execFork state entry member arguments
     | Just parent <- state ^. currentThreadId =
-        fst <$> spawn state parent entry member arguments
+        spawn state parent entry member arguments
     | otherwise = 
-        throw (InternalError "execFork: cannot get current thread")
+        stop state "execFork: cannot get current thread"
 
 execMemberEntry :: ExecutionState -> Engine r [ExecutionState]
 execMemberEntry state =
-    -- Verify the pre condition if this is not the first call.
+    -- Verify the pre condition if this is the first call.
     case state ^. programTrace of
-        [] -> 
-            return [state]
-        _  -> do
-            doVerifyRequires <- verifyRequires <$> askConfig
-            if doVerifyRequires
-                then do
-                    let thread0 = getCurrentThread state
-                    case thread0 of
-                        Nothing      -> 
-                            throw (InternalError "execMemberEntry: cannot get current thread")
-                        Just thread1 -> do
-                            let requires = fromJust (getLastStackFrame thread1) ^. currentMember ^?! SL.specification ^?! SL.requires
-                            maybe (return [state]) (execAssert state) requires
-                else
-                    return [state]
+        [] -> return [state]
+        _  -> execAssertRequires state
 
-execMemberExit :: ExecutionState -> RuntimeType -> Maybe Expression -> Engine r [(ExecutionState, Maybe ((), Node))]
-execMemberExit state0 returnTy ensures = do
+execMemberExit :: ExecutionState -> RuntimeType -> Engine r [(ExecutionState, Maybe ((), Node))]
+execMemberExit state0 returnTy = do
     -- Verify the post-condition
-    doVerifyEnsures <- verifyEnsures <$> askConfig
-    states <- if doVerifyEnsures && isJust ensures 
-                then execAssert state0 (fromJust ensures)
-                else return [state0]
+    states <- execAssertEnsures state0
     concatForM states $ \ state1 ->   
         if isLastStackFrame state1
             -- Despawn if this is the last stack frame to be popped
@@ -152,19 +181,20 @@ execMemberExit state0 returnTy ensures = do
                 return [(state2, Nothing)]
             -- Otherwise pop the stack frame with a copied return value.
             else
-                case getCurrentThread state0 of
+                case getCurrentThread state1 of
                     Nothing ->
-                            throw (InternalError "execMemberExit: cannot get current thread")
+                            stop state1 "execMemberExit: cannot get current thread"
                     Just thread1 -> do
                         let oldFrame  = fromJust (getLastStackFrame thread1)
                         let neighbour = Just ((), oldFrame ^. returnPoint)
                         state2 <- popStackFrame state1
-                        -- Check if we need te assign the return value to some lhs
-                        case oldFrame ^. lhs of
+                        -- Check if we need te assign the return value to some target
+                        case oldFrame ^. target of
                             Just lhs -> do
                                 retval <- readDeclaration state1 retval'
                                 state3 <- writeDeclaration state2 retval' retval
-                                map (, neighbour) <$> execAssign state3 lhs (rhsExpr' (var' retval' returnTy))
+                                let rhs = rhsExpr' (var' retval' returnTy)
+                                map (, neighbour) <$> execAssign state3 lhs rhs
                             Nothing  -> 
                                 -- No assignment to be done, continue the execution.
                                 return [(state2, neighbour)]
@@ -182,45 +212,28 @@ execReturn state0 (Just expression) = do
 execException :: ExecutionState -> Engine r [(ExecutionState, Maybe ((), Node))]
 execException state0
     -- Within a try block.
-    | Just (handler, pops) <- findLastHandler state0 =
+    | Just (handler, pops) <- findLastHandler state0 = do
+        debug ("Handling an exception with '" ++ show pops ++ "' left") 
         case pops of
             -- With no more stack frames to pop.
             0 -> 
                 return [(state0, Just ((), handler))]
             -- With some stack frames left to pop
             _ -> do
-                doVerifyExceptional <- verifyExceptional <$> askConfig
-                if doVerifyExceptional 
-                    then
-                        case getCurrentThread state0 of
-                            Nothing     -> throw (InternalError "execException: cannot get current thread")
-                            Just thread -> do
-                                let exceptional = fromJust (getLastStackFrame thread) ^. currentMember ^?! SL.specification ^?! SL.exceptional
-                                states <- maybe (return [state0]) (execAssert state0) exceptional
-                                concatForM states $ \ state1 -> do
-                                    state2 <- popStackFrame state1
-                                    execException state2
-                    else do
-                        state1 <- popStackFrame state0
-                        execException state1
+                states <- execAssertExceptional state0
+                concatForM states $ \ state1 -> do
+                    state2 <- popStackFrame state1
+                    execException state2
     -- Not within a try block.
     | otherwise = do
-        -- Verify the exceptional post condition of the complete stack trace.
-        doVerifyExceptional <- verifyExceptional <$> askConfig
-        if doVerifyExceptional 
-            then 
-                case getCurrentThread state0 of
-                    Nothing     -> throw (InternalError "execException: cannot get current thread")
-                    Just thread -> do
-                        let exceptional = fromJust (getLastStackFrame thread) ^. currentMember ^?! SL.specification ^?! SL.exceptional
-                        states <- maybe (return [state0]) (execAssert state0) exceptional
-                        concatForM states $ \ state1 ->
-                            if isLastStackFrame state1
-                                then return []
-                                else do
-                                    state2 <- popStackFrame state1
-                                    execException state2
-            else return []
+        states <- execAssertExceptional state0
+        concatForM states $ \ state1 -> do
+            if isLastStackFrame state1
+                then 
+                    return []
+                else do
+                    state2 <- popStackFrame state1
+                    execException state2
 
 execTryEntry :: ExecutionState -> Node -> Engine r ExecutionState
 execTryEntry = insertHandler
@@ -248,22 +261,22 @@ execLock state0 var = do
         Ref ref _ _       ->
             case state0 ^. currentThreadId of
                 Nothing         -> 
-                    throw (InternalError "execLock: cannot get current thread") 
+                    stop state0 "execLock: cannot get current thread"
                 Just currentTid -> 
                     case LockSet.lookup ref (state0 ^. locks) of
                         Just tid -> if tid == currentTid then return [state0] else infeasible
                         Nothing  -> return [state0 & (locks %~ LockSet.insert ref currentTid)]
         _                 -> 
-            throw (InternalError "execLock: expected a reference")
+            stop state0 "execLock: expected a reference"
 
 execUnlock :: ExecutionState -> Identifier -> Engine r ExecutionState
 execUnlock state var = do
     ref <- readDeclaration state var
     case ref of
-        Lit NullLit{} _ _ -> throw (InternalError "execT: null in unlock statement.")
-        SymbolicRef{}     -> throw (InternalError "execT: symbolic reference in unlock statement.")
+        Lit NullLit{} _ _ -> stop state "execT: null in unlock statement."
+        SymbolicRef{}     -> stop state "execT: symbolic reference in unlock statement."
         Ref ref _ _       -> return $ state & (locks %~ LockSet.remove ref)
-        _                 -> throw (InternalError "execUnlock: expected a reference")
+        _                 -> stop state "execUnlock: expected a reference"
 
 execAssign :: ExecutionState -> Lhs -> Rhs -> Engine r [ExecutionState]
 execAssign state0 _ RhsCall{} = 
@@ -284,7 +297,7 @@ execLhs state lhs@LhsField{} value = do
         Lit NullLit{} _ _ -> infeasible
         Ref ref _ _       -> (:[]) <$> writeConcreteField state ref field value
         SymbolicRef{}     -> (:[]) <$> writeSymbolicField state ref field value
-        _                 -> throw (InternalError "execLhs: expected a reference")
+        _                 -> stop state "execLhs: expected a reference"
             
 execLhs state0 lhs@LhsElem{} value = do
     ref <- readDeclaration state0 (lhs ^?! SL.var)
@@ -300,10 +313,10 @@ execLhs state0 lhs@LhsElem{} value = do
             concretize concretizations state1 $ \ state2 ->
                 case AliasMap.lookup symRef (state2 ^. aliasMap) of
                     Nothing   -> 
-                        throw (InternalError "execLhs: No concrete references")
+                        stop state2 "execLhs: No concrete references"
                     Just refs ->
                         if length refs /= 1
-                            then throw (InternalError "execLhs: Non concretized symbolic reference")
+                            then stop state2 "execLhs: Non concretized symbolic reference"
                             else do
                                 (state3, index) <- evaluateAsInt state2 (lhs ^?! SL.index)
                                 let (Ref ref _ _) = S.elemAt 0 refs
@@ -311,7 +324,7 @@ execLhs state0 lhs@LhsElem{} value = do
                                     Right index -> writeConcreteElem state3 ref index value
                                     Left index  -> writeSymbolicElem state3 ref index value
         _                      ->
-            throw (InternalError "execLhs: expected a reference")
+            stop state0 "execLhs: expected a reference"
 
 execRhs :: ExecutionState -> Rhs -> Engine r [(ExecutionState, Expression)]
 execRhs state0 rhs@RhsExpression{} = do
@@ -338,7 +351,7 @@ execRhs state0 rhs@RhsField{} = do
             value <- execRhsFieldConditional ref field
             return [(state0, value)]
         _                 -> 
-            throw (InternalError "execRhs: expected a reference or conditional")
+            stop state0 "execRhs: expected a reference or conditional"
         where
             execRhsFieldConditional :: Expression -> Identifier -> Engine r Expression
             execRhsFieldConditional (Conditional guard true0 false0 ty info) field = do
@@ -352,7 +365,7 @@ execRhs state0 rhs@RhsField{} = do
             execRhsFieldConditional ref@SymbolicRef{} field =
                 readSymbolicField state0 ref field
             execRhsFieldConditional _ _ =
-                throw (InternalError "execRhsFieldConditional: expected a reference or conditional")
+                stop state0 "execRhsFieldConditional: expected a reference or conditional"
   
 execRhs state0 rhs@RhsElem{} = do
     let var = rhs ^?! SL.var ^?! SL.var
@@ -362,10 +375,10 @@ execRhs state0 rhs@RhsElem{} = do
         SymbolicRef ref _ _ -> 
             case AliasMap.lookup ref (state0 ^. aliasMap) of
                 Nothing      -> 
-                    throw (InternalError "execRhs: no aliases")
+                    stop state0 "execRhs: no aliases"
                 Just aliases -> 
                     if S.size aliases /= 1
-                        then throw (InternalError "execRhs: Symbolic Reference")
+                        then stop state0 "execRhs: Symbolic Reference"
                         else do
                             let alias = S.elemAt 0 aliases
                             debug ("Overwritting '" ++ toString var ++ "' with single alias '" ++ toString alias ++ "'")
@@ -376,14 +389,14 @@ execRhs state0 rhs@RhsElem{} = do
             value <- either (readSymbolicElem state1 ref) (readConcreteElem state1 ref) index
             return [(state1, value)]
         _                   ->
-            throw (InternalError "execRhs: expected a reference")
+            stop state0 "execRhs: expected a reference"
 
 execRhs state0 rhs@RhsArray{} = do 
     (state1, sizes) <- mapAccumM evaluateAsInt state0 (rhs ^?! SL.sizes)
     (:[]) <$> execNewArray state1 sizes (typeOf rhs)
 
-execRhs _ RhsCall{} =
-    throw (InternalError "execRhs: Evaluating a method call")
+execRhs state RhsCall{} =
+    stop state "execRhs: Evaluating a method call"
 
 execNewArray :: ExecutionState -> [EvaluationResult Int] -> RuntimeType -> Engine r (ExecutionState, Expression)
 execNewArray state [Right size] ty = do
@@ -402,5 +415,5 @@ execNewArray state0 (Right size:sizes) ty = do
             (state2, ref) <- execNewArray state1 sizes elemTy
             return (state2, ref : refs)
 
-execNewArray _ _ _ =
-    throw (InternalError "execNewArray: symbolic size")
+execNewArray state _ _ =
+    stop state "execNewArray: symbolic size"

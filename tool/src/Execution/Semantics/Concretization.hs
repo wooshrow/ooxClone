@@ -169,8 +169,8 @@ initializeSymbolicObject state0 (SymbolicRef ref ty _) = do
     let cases    = S.insert concRef (aliases `S.union` nullCase)
     return $ state1 & (aliasMap %~ AliasMap.insert ref cases)
 
-initializeSymbolicObject _ expression =
-    throw (InternalError ("initializeSymbolicObject: non-symbolic reference '" ++ toString expression ++ "'"))
+initializeSymbolicObject state0 expression =
+    stop state0 ("initializeSymbolicObject: non-symbolic reference '" ++ toString expression ++ "'")
 
 initializeSymbolicField :: ExecutionState -> DeclarationMember -> Engine r (Identifier, Expression)
 initializeSymbolicField state field = do

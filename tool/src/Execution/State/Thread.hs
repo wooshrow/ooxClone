@@ -1,9 +1,10 @@
 module Execution.State.Thread(
       ThreadId(..)
     , StackFrame(StackFrame)
-    , returnPoint, lhs, declarations, currentMember
+    , returnPoint, target, declarations, currentMember
     , Thread(Thread)
     , tid, parent, _pc, pc, callStack, handlerStack
+    , processTid
 ) where
 
 import qualified Data.Stack                 as T
@@ -16,11 +17,18 @@ import           Language.Syntax
 
 newtype ThreadId = ThreadId { unThreadId :: Int }
 
+processTid :: ThreadId
+processTid = ThreadId (-1)
+
 instance Show ThreadId where
-    show (ThreadId tid) = show tid
+    show tid@(ThreadId value) 
+        | tid == processTid = "none"
+        | otherwise         = show value
 
 instance Pretty.Pretty ThreadId where
-    pretty = Pretty.int . unThreadId
+    pretty tid@(ThreadId value)
+        | tid == processTid = Pretty.text "none"
+        | otherwise         = Pretty.int value
 
 instance Eq ThreadId where
     (ThreadId a) == (ThreadId b) = a == b
@@ -30,7 +38,7 @@ instance Ord ThreadId where
 
 data StackFrame = StackFrame
     { _returnPoint   :: Node
-    , _lhs           :: Maybe Lhs
+    , _target        :: Maybe Lhs
     , _declarations  :: M.Map Identifier Expression
     , _currentMember :: DeclarationMember }
     deriving (Show)
@@ -40,7 +48,7 @@ $(makeLenses ''StackFrame)
 instance Pretty.Pretty StackFrame where
     pretty frame = 
         Pretty.text "returnPoint="  <> Pretty.pretty (frame ^. returnPoint)  Pretty.$+$
-        Pretty.text "lhs="          <> Pretty.pretty (frame ^. lhs)          Pretty.$+$
+        Pretty.text "target="       <> Pretty.pretty (frame ^. target)       Pretty.$+$
         Pretty.text "declarations=" <> Pretty.pretty (frame ^. declarations)
 
 data Thread = Thread 

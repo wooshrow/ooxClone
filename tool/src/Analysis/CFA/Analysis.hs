@@ -48,7 +48,7 @@ initMember className method
 
 finalMember :: Identifier -> DeclarationMember -> CFGNodes
 finalMember className method
-    = S.singleton (label, MemberExit (typeOf method) className methodName params (method ^?! SL.specification ^. SL.ensures))
+    = S.singleton (label, MemberExit (typeOf method) className methodName params)
     where
         label      = method ^?! SL.labels ^. _2
         methodName = method ^?! SL.name
@@ -275,7 +275,7 @@ memberEntryNodeValue entry
 
 memberExitNodeValue :: SymbolTableEntry -> CFGNodeValue
 memberExitNodeValue entry 
-    = MemberExit (typeOf method) (declaration ^. SL.name) (method ^?! SL.name) parameters (method ^?! SL.specification ^. SL.ensures)
+    = MemberExit (typeOf method) (declaration ^. SL.name) (method ^?! SL.name) parameters
     where
         declaration = getDeclaration entry
         method      = getMember entry

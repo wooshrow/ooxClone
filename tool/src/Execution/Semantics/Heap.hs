@@ -17,7 +17,6 @@ import           Control.Monad
 import qualified Data.Map as M
 import qualified Data.Set as S
 import           Text.Pretty
-import           Polysemy.Error
 import           Control.Lens
 import           Data.Positioned
 import           Analysis.Type.Typeable
@@ -27,7 +26,6 @@ import           Execution.State.AliasMap as AliasMap
 import           Language.Syntax
 import           Language.Syntax.DSL
 import qualified Language.Syntax.Lenses as SL
-import           Verification.Result
 
 allocate :: ExecutionState -> HeapValue -> Engine r (ExecutionState, Expression)
 allocate state0 structure = do
@@ -39,7 +37,7 @@ allocate state0 structure = do
 dereference :: ExecutionState -> Reference -> Engine r HeapValue
 dereference state ref = do
     let structure = Heap.lookup ref (state ^. heap)
-    maybe (segfault ref) return structure
+    maybe (segfault state ref) return structure
 
 --------------------------------------------------------------------------------
 -- Object handling
@@ -53,14 +51,14 @@ writeConcreteField state ref field value = do
             let newStructure = ObjectValue (M.insert field value values) ty
             return $ state & (heap %~ Heap.insert ref newStructure)
         ArrayValue values     ->
-             throw (InternalError ("writeConcreteField: array value '" ++ toString values ++ "'"))
+             stop state ("writeConcreteField: array value '" ++ toString values ++ "'")
 
 writeSymbolicField :: ExecutionState -> Expression -> Identifier -> Expression -> Engine r ExecutionState
 writeSymbolicField state ref@SymbolicRef{} field value =
     -- TODO: originally, null was removed from the alias map
     case AliasMap.lookup (ref ^?! SL.var) (state ^. aliasMap) of
         Just aliases -> foldM writeSymbolicAliasField state (S.filter (/= lit' nullLit') aliases)
-        Nothing      -> throw (InternalError "writeSymbolicField: no aliases") 
+        Nothing      -> stop state "writeSymbolicField: no aliases"
     where
         writeSymbolicAliasField :: ExecutionState -> Expression -> Engine r ExecutionState
         writeSymbolicAliasField stateN alias@Ref{} = do
@@ -71,8 +69,8 @@ writeSymbolicField state ref@SymbolicRef{} field value =
 writeSymbolicField _ (Lit NullLit{} _ _) _ _ = 
     infeasible
 
-writeSymbolicField _ _ _ _ =
-    throw (InternalError "writeSymbolicField: non-reference") 
+writeSymbolicField state _ _ _ =
+    stop state "writeSymbolicField: non-reference"
 
 readConcreteField :: ExecutionState -> Reference -> Identifier -> Engine r Expression
 readConcreteField state ref field = do
@@ -81,9 +79,9 @@ readConcreteField state ref field = do
         ObjectValue values _ ->
             case values M.!? field of
                 Just value -> return value
-                Nothing    -> throw (InternalError ("readConcreteField: " ++ toString field))
+                Nothing    -> stop state ("readConcreteField: " ++ toString field)
         ArrayValue values    ->
-             throw (InternalError ("readConcreteField: array value '" ++ toString values ++ "'"))
+             stop state ("readConcreteField: array value '" ++ toString values ++ "'")
 
 readSymbolicField :: ExecutionState -> Expression -> Identifier -> Engine r Expression
 readSymbolicField state ref@SymbolicRef{} field = 
@@ -92,13 +90,13 @@ readSymbolicField state ref@SymbolicRef{} field =
         Just aliases -> do
             options <- mapM readSymbolicAliasField (S.toList (S.filter (/= lit' nullLit') aliases))
             return $ foldr (\ (concRef, value) -> conditional' (ref `equal'` concRef) value) (head options ^. _2) (tail options)
-        Nothing      -> throw (InternalError "readSymbolicField: no aliases") 
+        Nothing      -> stop state "readSymbolicField: no aliases"
     where
         readSymbolicAliasField :: Expression -> Engine r (Expression, Expression)
         readSymbolicAliasField ref = (ref, ) <$> readConcreteField state (ref ^?! SL.ref) field
 
-readSymbolicField _ _ _ =
-    throw (InternalError "readSymbolicField: non-reference") 
+readSymbolicField state _ _ =
+    stop state "readSymbolicField: non-reference"
 
 --------------------------------------------------------------------------------
 -- Array handling
@@ -145,8 +143,8 @@ writeSymbolicElem state ref index value = do
 -- Auxiliary functions
 --------------------------------------------------------------------------------
 
-segfault :: Reference -> Engine r HeapValue
-segfault ref = throw (InternalError ("segfault on reference '" ++ show ref ++ "'"))
+segfault :: ExecutionState -> Reference -> Engine r HeapValue
+segfault state ref = stop state ("segfault on reference '" ++ show ref ++ "'")
 
 {-
 

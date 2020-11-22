@@ -99,11 +99,11 @@ substitute state0 expression = foldExpression algebra expression state0
                 ref <- readDeclaration state1 var
                 case ref of 
                     Lit NullLit{} _ _ -> infeasible
-                    SymbolicRef{}     -> throw (InternalError "substitute: SizeOf of symbolic reference")
+                    SymbolicRef{}     -> stop state1 "substitute: SizeOf of symbolic reference"
                     Ref ref _ _       -> do
                         size <- fmap (lit' . intLit') (sizeof state1 ref)
                         return (state1, size)
-                    _                 -> throw (InternalError "substitute: SizeOf of non-reference")
+                    _                 -> stop state1 "substitute: SizeOf of non-reference"
 
             , fRef = \ ref ty pos state1 ->
                 return (state1, Ref ref ty pos)
@@ -202,7 +202,7 @@ evaluateQuantifier quantifier element range domain formula _ _ state0 = do
     ref <- readDeclaration state0 domain
     case ref of
         Lit NullLit{} _ _ -> infeasible
-        SymbolicRef{}     -> throw (InternalError "evaluateQuantifier: symbolic reference")
+        SymbolicRef{}     -> stop state0 "evaluateQuantifier: symbolic reference"
         Ref ref _ _       -> do
             structure <- dereference state0 ref
             let (ArrayValue values) = structure

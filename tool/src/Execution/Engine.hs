@@ -22,7 +22,6 @@ import           Text.Pretty
 import           Analysis.CFA.CFG
 import           Analysis.SymbolTable
 import           Execution.Semantics
-import           Execution.Semantics.Process
 import           Execution.Semantics.Concretization
 import           Execution.Semantics.PartialOrderReduction
 import           Execution.State
@@ -50,8 +49,9 @@ execute table cfg = do
 start :: ExecutionState -> DeclarationMember -> Engine r ()
 start state0 initialMethod = do
     (config, cfg, _) <- ask
-    let state1 = state0 & remainingK .~ maximumDepth config
-    (state2, tid) <- spawn state1 undefined (context cfg (initialMethod ^?! SL.labels ^. _1) ^. _2) initialMethod arguments
+    let state1 = state0 & remainingK .~ maximumDepth config & currentThreadId ?~ processTid
+    let entry = context cfg (initialMethod ^?! SL.labels ^. _1) ^. _2
+    (state2, tid) <- execFork state1 entry initialMethod arguments
     debug ("Spawning initial thread with thread id '" ++ toString tid ++ "'")
     let state3 = state2 & (currentThreadId ?~ tid)
     -- Add the pre-condition as assumption, branch if it contains an array.
@@ -75,11 +75,9 @@ execP state0 = do
     if null allThreads 
         then finish
         else do
-            enabledThreads <- filterM (isEnabled state0) (S.toList allThreads)
-            when (null enabledThreads) 
-                (throw $ Deadlock (state0 ^. programTrace))
+            enabledThreads    <- filterM (isEnabled state0) (S.toList allThreads)
             (state1, threads) <- por state0 enabledThreads
-            config <- askConfig
+            config            <- askConfig
             if applyRandomInterleaving config
                 then 
                     branch_ (\ thread -> execT (state1 & (currentThreadId ?~ (thread ^. tid))) (thread ^. pc)) threads
@@ -87,53 +85,13 @@ execP state0 = do
                     shuffledThreads <- embed (shuffleM threads)
                     branch_ (\ thread -> execT (state1 & (currentThreadId ?~ (thread ^. tid))) (thread ^. pc)) shuffledThreads
 
-            {-if applyPOR
-                then do
-                    uniqueThreads  <- filterM isUniqueInterleaving enabledThreads
-                    newConstraints <- por enabledThreads
-                    updateInterleavingConstraints newConstraints
-                    if applyRandomInterleaving
-                        then do
-                            shuffledThreads <- embed (shuffleM uniqueThreads)
-                            branch_ (execT state) shuffledThreads 
-                        else branch_ (execT state) uniqueThreads 
-                else if applyRandomInterleaving
-                    then do
-                        shuffledThreads <- embed (shuffleM enabledThreads)
-                        branch_ (execT state) shuffledThreads
-                    else branch_ (execT state) enabledThreads
-            -}
--- branch_ (\ thread -> execT (state & (currentThreadId ?~ (thread ^. tid))) (thread ^. pc)) allThreads
-
-{-
-isUniqueInterleaving :: Thread -> Engine r Bool
-isUniqueInterleaving thread = do
-    currentProgramTrace <- getProgramTrace
-    not . any (isUnique currentProgramTrace) <$> getInterleavingConstraints
-    where
-        isUnique currentProgramTrace (IndependentConstraint previous current)
-            = (thread ^. pc) == current && previous `elem` currentProgramTrace
-        isUnique _ NotIndependentConstraint{}
-            = False
-
-updateInterleavingConstraints :: InterleavingConstraints -> Engine r ()
-updateInterleavingConstraints newConstraints = do
-    oldConstraints <- Prelude.filter (isConflict newConstraints) <$> getInterleavingConstraints
-    modifyLocal (\ state -> state & (interleavingConstraints .~ (oldConstraints ++ newConstraints)))
-
-isConflict :: [InterleavingConstraint] -> InterleavingConstraint -> Bool
-isConflict _              (IndependentConstraint _ _)      = False
-isConflict newConstraints (NotIndependentConstraint x1 y1) =
-    any (\case (IndependentConstraint x2 y2)  -> S.fromList [x1, y1] `S.disjoint` S.fromList [x2, y2]
-               (NotIndependentConstraint _ _) -> False) newConstraints
-    -}
 --------------------------------------------------------------------------------
 -- Thread Execution
 
 -- | Symbolically executes the thread.
 execT :: ExecutionState -> CFGContext -> Engine r ()
-execT state0 (_, _, ExceptionalNode, _) = do
-    states <- execException state0
+execT state (_, _, ExceptionalNode, _) = do
+    states <- execException state
     branch_ (uncurry stepM) states
 
 -- A Method Call
@@ -147,27 +105,26 @@ execT state0 (_, _, CallNode entry constructor@Constructor{} Nothing arguments l
     step state1 ((), entry)
 
 -- A Method or Constructor Call with not exactly one neighbour 
-execT _ (_, _, CallNode{}, ns) =
-    throw (InternalError ("execT: there should be exactly 1 neighbour, there are '" ++ show (length ns) ++ "'"))
+execT state0 (_, _, CallNode{}, ns) =
+    stop state0 ("execT: there should be exactly 1 neighbour, there are '" ++ show (length ns) ++ "'")
 
 -- A Fork
 execT state0 (_, _, ForkNode entry method arguments, neighbours) = do
-    state1 <- execFork state0 entry method arguments
+    (state1, _) <- execFork state0 entry method arguments
     branch_ (step state1) neighbours
 
 -- A Member Entry
 execT state0 (_, _, MemberEntry{}, neighbours) = do
     states <- execMemberEntry state0
-    -- Continue the execution.
     branch_ ( \ state1 -> branch_ (step state1) neighbours) states
 
 -- A Member Exit
-execT state0 (_, _, MemberExit returnTy _ _ _ ensures, []) = do
-    states <- execMemberExit state0 returnTy ensures
+execT state0 (_, _, MemberExit returnTy _ _ _, []) = do
+    states <- execMemberExit state0 returnTy
     branch_ (uncurry stepM) states
 
-execT _ (_, _, MemberExit{}, ns) =
-    throw (InternalError ("execT: there should be exactly 0 neighbour, there are '" ++ show (length ns) ++ "'"))
+execT state0 (_, _, MemberExit{}, neighbours) =
+    stop state0 ("execT: there should be exactly 0 neighbour, there are '" ++ show (length neighbours) ++ "'")
 
 -- A Try Entry
 execT state0 (_, _, TryEntry handler, neighbours) = do
@@ -251,8 +208,13 @@ updatePC state (Just (_, node)) = do
         Nothing      -> 
             return state
         Just thread0 -> do
+            debug ("Updating pc to '" ++ show node ++ "'")
             let thread1 = thread0 & (pc .~ context cfg node)
             return $ updateThreadInState state thread1 & (programTrace %~ ((thread0 ^. pc) :))
+
+--------------------------------------------------------------------------------
+-- Brancing functions
+--------------------------------------------------------------------------------
 
 branch :: Foldable t => (a -> Engine r b) -> t a -> Engine r [b]
 branch f options = do
@@ -263,18 +225,3 @@ branch f options = do
 
 branch_ :: Foldable t => (a -> Engine r ()) -> t a -> Engine r ()
 branch_ f = void . branch f
-
---------------------------------------------------------------------------------
--- Branching Functions
---------------------------------------------------------------------------------
-{-
-branchCS_ :: Thread -> [[Concretization]] -> Engine r () -> Engine r ()
-branchCS_ _      []       continueF = continueF
-branchCS_ thread (cs:css) continueF = branchC_ thread cs (branchCS_ thread css continueF)
-
-branchC_ :: Thread -> [Concretization] -> Engine r () -> Engine r ()
-branchC_ _ [] continueF = continueF
-branchC_ _ cs continueF = branch_ (\ concretization -> do
-    mapM_ (\ (symRef, concRef) -> setAliases symRef (S.singleton concRef)) (M.toList concretization)
-    continueF) cs
--}

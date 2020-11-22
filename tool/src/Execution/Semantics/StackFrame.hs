@@ -3,11 +3,9 @@ module Execution.Semantics.StackFrame where
 import qualified Data.Stack as T
 import qualified Data.Map as M
 import           Text.Pretty
-import           Polysemy.Error
 import           Control.Lens hiding (assign)
 import           Execution.State
 import           Execution.State.Thread
-import           Verification.Result
 import           Language.Syntax
 
 writeDeclaration :: ExecutionState -> Identifier -> Expression -> Engine r ExecutionState

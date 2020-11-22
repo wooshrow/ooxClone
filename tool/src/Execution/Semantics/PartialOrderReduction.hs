@@ -6,19 +6,19 @@ module Execution.Semantics.PartialOrderReduction(
 import qualified Data.Set as S
 import           Control.Lens hiding (children)
 import           Control.Monad
-import           Polysemy.Error
 import           Text.Pretty
 import           Data.Configuration
 import           Execution.State
 import           Execution.State.Thread
 import           Execution.State.LockSet as LockSet
+import           Execution.State.AliasMap as AliasMap
 import           Execution.State.InterleavingConstraints
 import           Execution.Semantics.StackFrame
 import           Analysis.CFA.CFG
 import           Language.Syntax
 import           Language.Syntax.Fold
+import           Language.Syntax.DSL
 import qualified Language.Syntax.Lenses as SL
-import           Verification.Result
 
 isEnabled :: ExecutionState -> Thread -> Engine r Bool
 isEnabled state thread
@@ -32,7 +32,7 @@ isEnabled state thread
                     Just tid' -> return (tid' == thread ^. tid)
                     Nothing   -> return True
             _                 -> 
-                throw (InternalError ("isEnabled: non-reference '" ++ toString ref ++ "'"))
+                stop state ("isEnabled: non-reference '" ++ toString ref ++ "'")
     | (_, _, StatNode (Join _ _), _) <- thread ^. pc = 
         S.null <$> children state (thread ^. tid)
     | otherwise = 
@@ -43,7 +43,7 @@ children state tid =
     return $ S.filter (\ thread -> thread ^. parent == tid) (state ^. threads)
 
 por :: ExecutionState -> [Thread] -> Engine r (ExecutionState, [Thread])
-por state0 []      = return (state0, [])
+por state0 []      = deadlock state0
 por state0 threads = do
     config <- askConfig
     if not (applyPOR config)
@@ -52,8 +52,6 @@ por state0 threads = do
         else do
             uniqueThreads <- filterM (isUniqueInterleaving state0) threads
             state1 <- generateConstraints state0 threads
-            {-newConstraints <- por enabledThreads
-            updateInterleavingConstraints newConstraints-}
             return (state1, uniqueThreads)
 
 isUniqueInterleaving :: ExecutionState -> Thread -> Engine r Bool
@@ -75,7 +73,7 @@ generateConstraints state threads = do
     where 
         construct :: InterleavingConstraints -> (Thread, Thread) -> Engine r InterleavingConstraints
         construct acc pair@(thread1, thread2) = do
-            isIndep <- isIndependent pair
+            isIndep <- isIndependent state pair
             if isIndep 
                 then return (IndependentConstraint (thread1 ^. pc) (thread2 ^. pc) : acc)
                 else return (NotIndependentConstraint (thread1 ^. pc) (thread2 ^. pc) : acc)
@@ -92,83 +90,74 @@ isConflict newConstraints (NotIndependentConstraint x1 y1) =
     any (\case (IndependentConstraint x2 y2)  -> S.fromList [x1, y1] `S.disjoint` S.fromList [x2, y2]
                (NotIndependentConstraint _ _) -> False) newConstraints
 
-{-thread
-    = case thread ^. pc of
-        (_, _, StatNode (Lock var _ _), _) -> do 
-            ref <- readVar thread var
-            processRef ref
-                (fmap not . locked (thread ^. tid))
-                (const (return True))
-                infeasible
-        (_, _, StatNode (Join _ _), _) -> do
-            children <- childrenOf thread
-            return $ S.null children
-        _   -> return True
--}
-
 type ReadWriteSet = (S.Set Reference, S.Set Reference)
 
-isIndependent :: (Thread, Thread) -> Engine r Bool
-isIndependent (thread1, thread2) = do
-    (wT1, rT1) <- dependentOperationsOfT thread1
-    (wT2, rT2) <- dependentOperationsOfT thread2
+isIndependent :: ExecutionState -> (Thread, Thread) -> Engine r Bool
+isIndependent state (thread1, thread2) = do
+    (wT1, rT1) <- dependentOperationsOfT state thread1
+    (wT2, rT2) <- dependentOperationsOfT state thread2
     return $ S.disjoint wT1 wT2 && S.disjoint rT1 wT2 && S.disjoint rT2 wT1
 
 -- | Returns the reads and writes of the current thread.
-dependentOperationsOfT :: Thread -> Engine r ReadWriteSet
-dependentOperationsOfT thread = dependentOperationsOfN thread (thread ^. pc)
+dependentOperationsOfT :: ExecutionState -> Thread -> Engine r ReadWriteSet
+dependentOperationsOfT state thread = dependentOperationsOfN state (thread ^. tid) (thread ^. pc)
 
 -- | Returns the reads and writes of the current program counter.
-dependentOperationsOfN :: Thread -> CFGContext -> Engine r ReadWriteSet
-dependentOperationsOfN thread (_, _, StatNode stat, _) 
-    = dependentOperationsOfS thread stat
-dependentOperationsOfN thread (_, _, CallNode _ _ Nothing arguments _, _) 
-    = (,S.empty) . S.unions <$> mapM (dependentOperationsOfE thread) arguments
+dependentOperationsOfN :: ExecutionState -> ThreadId -> CFGContext -> Engine r ReadWriteSet
+dependentOperationsOfN state tid (_, _, StatNode stat, _) 
+    = dependentOperationsOfS state tid stat
+dependentOperationsOfN state tid (_, _, CallNode _ _ Nothing arguments _, _) 
+    = (,S.empty) . S.unions <$> mapM (dependentOperationsOfE state tid) arguments
 --dependentOperationsOfN thread (_, _, CallNode _ _ (Just this) arguments _, _) 
 --    = (,S.empty) . S.unions <$> mapM (dependentOperationsOfE thread) arguments
-dependentOperationsOfN thread (_, _, ForkNode _ _ arguments, _) 
-    = (,S.empty) . S.unions <$> mapM (dependentOperationsOfE thread) arguments
-dependentOperationsOfN _ _                        
+dependentOperationsOfN state tid (_, _, ForkNode _ _ arguments, _) 
+    = (,S.empty) . S.unions <$> mapM (dependentOperationsOfE state tid) arguments
+dependentOperationsOfN _ _ _                        
     = return (S.empty, S.empty)
 
 -- | Returns the reads and writes of the current statement.
-dependentOperationsOfS :: Thread -> Statement -> Engine r ReadWriteSet
-dependentOperationsOfS thread (Assign lhs rhs _ _) = (\ l r -> (l,r)) <$> dependentOperationsOfLhs thread lhs <*> dependentOperationsOfRhs thread rhs
-dependentOperationsOfS thread (Assert ass _ _)     = (,S.empty) <$> dependentOperationsOfE thread ass
-dependentOperationsOfS thread (Assume ass _ _)     = (,S.empty) <$> dependentOperationsOfE thread ass
-dependentOperationsOfS thread (Return expr _ _)    = (,S.empty) <$> maybe (return S.empty) (dependentOperationsOfE thread) expr
-dependentOperationsOfS thread (Lock var _ _)       = (\ refs -> (refs, refs)) <$> getReferences thread var
-dependentOperationsOfS thread (Unlock var _ _)     = (\ refs -> (refs, refs)) <$> getReferences thread var
-dependentOperationsOfS _      _                    = return (S.empty, S.empty)
+dependentOperationsOfS :: ExecutionState -> ThreadId -> Statement -> Engine r ReadWriteSet
+dependentOperationsOfS state tid (Assign lhs rhs _ _) = (,)        <$> dependentOperationsOfLhs state tid lhs <*> dependentOperationsOfRhs state tid rhs
+dependentOperationsOfS state tid (Assert ass _ _)     = (,S.empty) <$> dependentOperationsOfE state tid ass
+dependentOperationsOfS state tid (Assume ass _ _)     = (,S.empty) <$> dependentOperationsOfE state tid ass
+dependentOperationsOfS state tid (Return expr _ _)    = (,S.empty) <$> maybe (return S.empty) (dependentOperationsOfE state tid) expr
+dependentOperationsOfS state tid (Lock var _ _)       = (\ refs -> (refs, refs)) <$> getReferences state tid var
+dependentOperationsOfS state tid (Unlock var _ _)     = (\ refs -> (refs, refs)) <$> getReferences state tid var
+dependentOperationsOfS _     _   _                    = return (S.empty, S.empty)
 
-dependentOperationsOfLhs :: Thread -> Lhs -> Engine r (S.Set Reference)
-dependentOperationsOfLhs _      LhsVar{}               = return S.empty
-dependentOperationsOfLhs thread (LhsField var _ _ _ _) = getReferences thread var
-dependentOperationsOfLhs thread (LhsElem var _ _ _)    = getReferences thread var
+dependentOperationsOfLhs :: ExecutionState -> ThreadId -> Lhs -> Engine r (S.Set Reference)
+dependentOperationsOfLhs _     _   LhsVar{}               = return S.empty
+dependentOperationsOfLhs state tid (LhsField var _ _ _ _) = getReferences state tid var
+dependentOperationsOfLhs state tid (LhsElem var _ _ _)    = getReferences state tid var
 
-dependentOperationsOfRhs :: Thread -> Rhs -> Engine r (S.Set Reference)
-dependentOperationsOfRhs thread (RhsExpression value _ _) = dependentOperationsOfE thread value
-dependentOperationsOfRhs thread (RhsField var _ _ _)      = getReferences thread (var ^?! SL.var)
-dependentOperationsOfRhs thread (RhsElem var _ _ _)       = getReferences thread (var ^?! SL.var)
-dependentOperationsOfRhs thread (RhsCall inv _ _)         = dependentOperationsOfI thread inv
-dependentOperationsOfRhs thread (RhsArray _ sizes _ _)    = S.unions <$> mapM (dependentOperationsOfE thread) sizes
+dependentOperationsOfRhs :: ExecutionState -> ThreadId -> Rhs -> Engine r (S.Set Reference)
+dependentOperationsOfRhs state tid (RhsExpression value _ _) = dependentOperationsOfE state tid value
+dependentOperationsOfRhs state tid (RhsField var _ _ _)      = getReferences state tid (var ^?! SL.var)
+dependentOperationsOfRhs state tid (RhsElem var _ _ _)       = getReferences state tid (var ^?! SL.var)
+dependentOperationsOfRhs state tid (RhsCall inv _ _)         = dependentOperationsOfI state tid inv
+dependentOperationsOfRhs state tid (RhsArray _ sizes _ _)    = S.unions <$> mapM (dependentOperationsOfE state tid) sizes
 
-dependentOperationsOfI :: Thread -> Invocation -> Engine r (S.Set Reference)
-dependentOperationsOfI thread inv 
-    = S.unions <$> mapM (dependentOperationsOfE thread) (inv ^. SL.arguments)
+dependentOperationsOfI :: ExecutionState -> ThreadId -> Invocation -> Engine r (S.Set Reference)
+dependentOperationsOfI state tid inv 
+    = S.unions <$> mapM (dependentOperationsOfE state tid) (inv ^. SL.arguments)
 
-dependentOperationsOfE :: Thread -> Expression -> Engine r (S.Set Reference)
-dependentOperationsOfE thread = foldExpression algebra
+dependentOperationsOfE :: ExecutionState -> ThreadId -> Expression -> Engine r (S.Set Reference)
+dependentOperationsOfE state tid = foldExpression algebra
     where
-        algebra = monoidMExpressionAlgebra -- TODO: quantifiers (- and var and ref)
-            { fSizeOf = \ var _ _ -> getReferences thread var }
+        algebra = monoidMExpressionAlgebra
+            { fForall = undefined
+            , fExists = undefined
+            , fSizeOf = \ var _ _ -> getReferences state tid var }
 
-getReferences :: Thread -> Identifier -> Engine r (S.Set Reference)
-getReferences thread var = undefined {-do
-    ref <- readVar thread var
-    processRef ref
-        (return . S.singleton)
-        (\ (SymbolicRef symRef _ _) -> do
-            aliases <- fromJust <$> getAliasesWithoutNull symRef
-            return $ S.map (^?! SL.ref) aliases)
-        (return S.empty)-}
+getReferences :: ExecutionState -> ThreadId -> Identifier -> Engine r (S.Set Reference)
+getReferences state tid var = do
+    ref <- readDeclaration (state & currentThreadId ?~ tid) var
+    case ref of
+        Lit NullLit{} _ _ -> return S.empty
+        Ref{}             -> return $ S.singleton (ref ^?! SL.ref)
+        SymbolicRef{}     ->
+            case AliasMap.lookup (ref ^?! SL.var) (state ^. aliasMap) of
+                Just aliases -> return . S.map (^?! SL.ref) . S.filter (/= lit' nullLit') $ aliases
+                Nothing      -> stop state "getReferences: no aliases"
+        _                 ->
+            stop state "getReferences: non-reference"

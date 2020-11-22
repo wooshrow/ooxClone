@@ -3,6 +3,7 @@ module Execution.State where
 import           Prelude hiding ((<>))
 import qualified Data.Set                 as S
 import           Data.Foldable
+import           Data.Positioned
 import           Control.Lens
 import           Polysemy           
 import           Polysemy.Reader
@@ -80,18 +81,35 @@ defaultValue ty = lit' $
         StringRuntimeType -> nullLit'      
 
 --------------------------------------------------------------------------------
--- Effect utilities
+-- Exploration utility functions
 --------------------------------------------------------------------------------
 
+-- | Terminate the current branch and continue other branches.
 infeasible :: Engine r a
 infeasible = measurePrune >> throw Infeasible
 
+-- | Terminate with an internal error.
 stop :: ExecutionState -> String -> Engine r a
 stop state message = do
-    throw (InternalError (message ++ " with state: \n" ++ toString state))
+    debug ("Stopping with state: \n" ++ toString state)
+    throw (InternalError message)
 
+-- | Terminate with an invalid expression.
+invalid :: ExecutionState -> Expression -> Engine r a
+invalid state expression = 
+    throw (Invalid (getPos expression) (state ^. programTrace))
+
+-- | Terminate with a deadlock.
+deadlock :: ExecutionState -> Engine r a
+deadlock state = throw (Deadlock (state ^. programTrace))
+
+-- | Terminate the current branch.
 finish :: Engine r ()
 finish = measureFinish
+
+--------------------------------------------------------------------------------
+-- Effect utilities
+--------------------------------------------------------------------------------
 
 haltInfeasible :: VerificationResult -> Engine r ()
 haltInfeasible Infeasible = return ()
