@@ -12,7 +12,7 @@ import           Polysemy.Error hiding (Throw)
 import           Polysemy.State
 import           Control.Monad hiding (guard)
 import           Control.Monad.Extra
-import           Control.Lens hiding (assign)
+import           Control.Lens ((&), (^?!), (^.), (%~), (-~), (.~), (?~), Field1(_1), Field2(_2))
 import           Data.Configuration
 import           Data.Error
 import           Data.Statistics

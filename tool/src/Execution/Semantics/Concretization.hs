@@ -17,7 +17,7 @@ import           Data.Positioned
 import           Control.Monad
 import           Control.Monad.Extra
 import           Text.Pretty
-import           Control.Lens hiding (assign)
+import           Control.Lens ((&), (^?!), (^.), (%~))
 import           Polysemy.Reader
 import           Polysemy.Error
 import           Language.Syntax

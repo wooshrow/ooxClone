@@ -7,7 +7,7 @@ module Execution.Semantics.Process(
 import qualified Data.Stack as T
 import qualified Data.Set as S
 import           Analysis.CFA.CFG
-import           Control.Lens hiding (assign)
+import           Control.Lens ((&), (^?!), (^.), (%~), (+~), (.~))
 import           Data.Configuration
 import           Execution.Semantics.Thread
 import           Execution.State
@@ -23,8 +23,8 @@ spawn state0 parent entry member arguments = do
     let thread     = Thread tid parent pc T.empty T.empty
     let state1     = updateThreadInState state0 thread
     let parameters = member ^?! SL.params
-    state1 <- pushStackFrame state1 tid entry member Nothing (zip parameters arguments)
-    return (state1 & (numberOfForks +~ 1), tid)
+    state2 <- pushStackFrame state1 tid entry member Nothing (zip parameters arguments)
+    return (state2 & (numberOfForks +~ 1), tid)
 
 despawnCurrentThread :: ExecutionState -> Engine r ExecutionState
 despawnCurrentThread state0

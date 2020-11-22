@@ -8,7 +8,7 @@ module Execution.Semantics.Evaluation(
 ) where
 
 import qualified Data.Set as S
-import           Control.Lens
+import           Control.Lens ((^.))
 import           Polysemy
 import           Polysemy.State
 import           Polysemy.Reader

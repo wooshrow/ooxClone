@@ -3,7 +3,7 @@ module Execution.Semantics.Exception where
 import qualified Data.Stack as T
 import           Analysis.CFA.CFG
 import           Data.Configuration
-import           Control.Lens hiding (assign)
+import           Control.Lens ((&), (^.), (%~))
 import           Execution.State
 import           Execution.State.Thread
 

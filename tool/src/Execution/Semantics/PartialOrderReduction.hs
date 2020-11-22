@@ -4,7 +4,7 @@ module Execution.Semantics.PartialOrderReduction(
 ) where
 
 import qualified Data.Set as S
-import           Control.Lens hiding (children)
+import           Control.Lens ((&), (^?!), (^.), (.~), (?~))
 import           Control.Monad
 import           Text.Pretty
 import           Data.Configuration

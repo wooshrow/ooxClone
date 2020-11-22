@@ -21,9 +21,8 @@ import qualified Data.Set as S
 import qualified Data.Map as M
 import           Data.Maybe
 import           Control.Monad
-import           Control.Lens hiding (assign)
+import           Control.Lens ((&), (^?!), (^.), (%~), (<>~))
 import           Control.Monad.Extra
-import           Polysemy.Error
 import           Polysemy.Cache
 import           Text.Pretty
 import           Data.Configuration
@@ -49,7 +48,6 @@ import           Execution.State.PathConstraints as PathConstraints
 import           Execution.State.LockSet as LockSet
 import           Execution.State.AliasMap as AliasMap
 import           Verification.Verifier
-import           Verification.Result
 
 execAssert :: ExecutionState -> Expression -> Engine r [ExecutionState]
 execAssert state0 assertion = do

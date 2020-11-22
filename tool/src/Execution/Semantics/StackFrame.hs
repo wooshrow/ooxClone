@@ -3,7 +3,7 @@ module Execution.Semantics.StackFrame where
 import qualified Data.Stack as T
 import qualified Data.Map as M
 import           Text.Pretty
-import           Control.Lens hiding (assign)
+import           Control.Lens ((&), (^.), (%~))
 import           Execution.State
 import           Execution.State.Thread
 import           Language.Syntax

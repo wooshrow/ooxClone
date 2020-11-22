@@ -2,8 +2,8 @@ module Execution.Semantics.Thread where
 
 import qualified Data.Stack as T
 import qualified Data.Map as M
-import           Control.Monad
-import           Control.Lens hiding (assign)
+import           Control.Monad (foldM)
+import           Control.Lens ((&), (^.), (%~))
 import           Analysis.CFA.CFG
 import           Execution.Semantics.StackFrame
 import           Execution.Semantics.Exception

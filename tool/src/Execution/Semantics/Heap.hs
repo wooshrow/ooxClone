@@ -17,7 +17,7 @@ import           Control.Monad
 import qualified Data.Map as M
 import qualified Data.Set as S
 import           Text.Pretty
-import           Control.Lens
+import           Control.Lens ((&), (^?!), (^.), (%~), (.~), element, Field2(_2))
 import           Data.Positioned
 import           Analysis.Type.Typeable
 import           Execution.State
