@@ -117,12 +117,13 @@ initializeSymbolicRef state var@(SymbolicRef ref ty _)
     | AliasMap.member ref (state ^. aliasMap) = 
         return state
     | ty `isOfType` ARRAYRuntimeType = do
-        debug ("Initializing symbolic reference '" ++ toString var ++ ":" ++ toString ty ++ "' ")
         initializeSymbolicArrays state var
-    | otherwise = do
-        debug ("Initializing symbolic reference '" ++ toString var ++ ":" ++ toString ty ++ "' ")
+    | otherwise =
         initializeSymbolicObject state var
-            
+
+initializeSymbolicRef state _ =
+    stop state "initializeSymbolicRef: expected a symbolic reference"
+
 createSymbolicVar :: Typeable a => Identifier -> a -> Expression
 createSymbolicVar (Identifier name pos) ty
     | ty `isOfType` REFRuntimeType = SymbolicRef (Identifier ('_' : name) pos) (typeOf ty) pos
@@ -139,14 +140,21 @@ initializeSymbolicArrays state0 var@(SymbolicRef ref ty _) = do
     let aliases  = if symbolicAliases config then otherAliasesOfType ty (state1 ^. aliasMap) else S.empty
     let nullCase = if symbolicNulls config then S.singleton (lit' nullLit') else S.empty
     let cases    = S.fromList refs `S.union` aliases `S.union` nullCase
+    debug ("Initializing symbolic reference '" ++ toString var ++ ":" ++ toString ty ++ "' to '" ++ toString cases ++ "'")
     return $ state1 & (aliasMap %~ AliasMap.insert ref cases)
 
+initializeSymbolicArrays state _ =
+    stop state "initializeSymbolicArrays: expected a symbolic reference"
+
 initializeSymbolicArray :: ExecutionState -> Expression -> Int -> Engine r (ExecutionState, Expression)
-initializeSymbolicArray state (SymbolicRef ref ty _) size = do
+initializeSymbolicArray state (SymbolicRef _ ty _) size = do
     let elemTy  = ty ^?! SL.innerTy    
     let indices = [0..size - 1]
     structure <- ArrayValue <$> mapM (initializeSymbolicElem state elemTy) indices
     allocate state structure
+    
+initializeSymbolicArray state _ _ =
+    stop state "initializeSymbolicArray: expected a symbolic reference"
 
 initializeSymbolicElem :: ExecutionState -> RuntimeType -> Int -> Engine r Expression
 initializeSymbolicElem state ty index = do
@@ -158,7 +166,7 @@ initializeSymbolicElem state ty index = do
 -- Lazy Symbolic Object Initialization
 
 initializeSymbolicObject :: ExecutionState -> Expression -> Engine r ExecutionState
-initializeSymbolicObject state0 (SymbolicRef ref ty _) = do
+initializeSymbolicObject state0 var@(SymbolicRef ref ty _) = do
     (config, _, table) <- ask
     let fields = (S.toList . S.map getMember . getAllFields (ty ^?! SL.ty)) table
     values <- mapM (initializeSymbolicField state0) fields
@@ -167,6 +175,7 @@ initializeSymbolicObject state0 (SymbolicRef ref ty _) = do
     let aliases  = if symbolicAliases config then otherAliasesOfType ty (state1 ^. aliasMap) else S.empty
     let nullCase = if symbolicNulls config then S.singleton (lit' nullLit') else S.empty
     let cases    = S.insert concRef (aliases `S.union` nullCase)
+    debug ("Initializing symbolic reference '" ++ toString var ++ ":" ++ toString ty ++ "' to '" ++ toString cases)
     return $ state1 & (aliasMap %~ AliasMap.insert ref cases)
 
 initializeSymbolicObject state0 expression =

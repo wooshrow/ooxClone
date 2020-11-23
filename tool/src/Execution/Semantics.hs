@@ -20,7 +20,7 @@ module Execution.Semantics(
 import qualified Data.Set as S
 import qualified Data.Map as M
 import           Data.Maybe
-import           Control.Monad
+import           Control.Monad (foldM)
 import           Control.Lens ((&), (^?!), (^.), (%~), (<>~))
 import           Control.Monad.Extra
 import           Polysemy.Cache
@@ -61,9 +61,9 @@ execAssert state0 assertion = do
         debug ("Verifying: '" ++ toString formula0 ++ "'")
         (state3, formula1) <- evaluateAsBool state2 formula0
         case formula1 of
-            Right True -> do
+            Right True ->
                 invalid state3 assertion
-            Right False -> do
+            Right False ->
                 return state3
             Left formula2 -> do
                 let verification = verify currentProgramTrace (state3 ^. aliasMap) (getPos assertion) formula2
@@ -225,7 +225,7 @@ execException state0
     -- Not within a try block.
     | otherwise = do
         states <- execAssertExceptional state0
-        concatForM states $ \ state1 -> do
+        concatForM states $ \ state1 ->
             if isLastStackFrame state1
                 then 
                     return []

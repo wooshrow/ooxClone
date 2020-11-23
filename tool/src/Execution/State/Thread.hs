@@ -73,4 +73,4 @@ instance Pretty.Pretty Thread where
         Pretty.text "parent="    <> Pretty.pretty (thread ^. parent)    Pretty.$+$
         Pretty.text "pc="        <> Pretty.pretty (thread ^. pc)        Pretty.$+$
         Pretty.text "parent="    <> Pretty.pretty (thread ^. parent)    Pretty.$+$
-        Pretty.text "callstack=" <> Pretty.pretty (thread ^. callStack)
+        Pretty.text "callstack=" <> (foldr (\ s acc -> Pretty.pretty s <> Pretty.comma Pretty.$+$ acc) mempty . T.toList) (thread ^. callStack)

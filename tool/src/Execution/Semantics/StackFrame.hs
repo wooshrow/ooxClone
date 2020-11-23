@@ -3,6 +3,7 @@ module Execution.Semantics.StackFrame where
 import qualified Data.Stack as T
 import qualified Data.Map as M
 import           Text.Pretty
+import           Data.Configuration
 import           Control.Lens ((&), (^.), (%~))
 import           Execution.State
 import           Execution.State.Thread
@@ -13,6 +14,7 @@ writeDeclaration state var value
     | Just thread0 <- getCurrentThread state =
         case getLastStackFrame thread0 of
             Just oldFrame -> do
+                debug ("Assigning '" ++ toString value ++ "' to '" ++ toString var ++ "'")
                 let newFrame = writeDeclarationOnFrame oldFrame var value
                 let thread1  = thread0 & (callStack %~ T.updateTop newFrame)
                 return $ updateThreadInState state thread1

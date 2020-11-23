@@ -43,7 +43,7 @@ pClassDeclaration = do
     return $ Class name members pos
     
 pMember :: Identifier -> P DeclarationMember
-pMember className = choice [pField, pMethod className, pConstructor className]
+pMember className = choice [try pField, try (pMethod className), try (pConstructor className)]
             
 pConstructor :: Identifier -> P DeclarationMember
 pConstructor className = do

@@ -134,7 +134,7 @@ writeSymbolicElem :: ExecutionState -> Reference -> Expression -> Expression -> 
 writeSymbolicElem state ref index value = do
     structure <- dereference state ref
     let (ArrayValue values) = structure
-    let newStructure = ArrayValue $ map (\ (oldValue, concIndex) -> conditional' (index `equal'` concIndex) value oldValue) (zip values indices)
+    let newStructure = ArrayValue $ zipWith (\ oldValue concIndex -> conditional' (index `equal'` concIndex) value oldValue) values indices
     return $ state & (heap %~ Heap.insert ref newStructure)
     where
         indices = map (lit' . intLit') [0..]

@@ -31,11 +31,16 @@ data HeapValue
 
 instance Typeable HeapValue where
     typeOf (ObjectValue _ ty) = ty
-    typeOf (ArrayValue es)    = typeOf $ head es
+    typeOf (ArrayValue es)    = ArrayRuntimeType (typeOf (head es))
 
 instance Pretty.Pretty HeapValue where
-    pretty (ObjectValue fields _) = Pretty.pretty fields
-    pretty (ArrayValue values)    = Pretty.pretty values
+    pretty (ObjectValue fields ty) = 
+        Pretty.pretty fields <> 
+        Pretty.text ":" <> Pretty.pretty ty
+        
+    pretty (ArrayValue values)     = 
+        Pretty.pretty values <> 
+        Pretty.text ":" <> Pretty.pretty (typeOf (head values)) <> Pretty.text "[]"
 
 lookup :: Reference -> Heap -> Maybe HeapValue
 lookup ref = M.lookup ref . unHeap
