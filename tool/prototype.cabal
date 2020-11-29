@@ -56,6 +56,7 @@ executable app
                           , Text.Pretty
                           , Polysemy.Cache
                           , Control.Monad.Extra
+                          , Logger
     main-is:                Main.hs
     build-depends:          base                 ^>=4.12.0.0
                           , parsec               ^>=3.1.14.0
