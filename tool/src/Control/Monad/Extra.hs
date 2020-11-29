@@ -17,9 +17,6 @@ foldM' f z (x:xs) = do
     z' <- f z x
     z' `seq` foldM' f z' xs
 
-concatM :: (Foldable t, Monad m) => m (t [a]) -> m [a]
-concatM = undefined
-
 concatMapM :: Monad m => (a -> m [b]) -> [a] -> m [b]
 concatMapM _ []     = return []
 concatMapM f (x:xs) = do

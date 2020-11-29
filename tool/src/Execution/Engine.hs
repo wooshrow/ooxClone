@@ -198,19 +198,11 @@ step state = stepM state . Just
 stepM :: ExecutionState -> Maybe ((), Node) -> Engine r ExecutionState
 stepM state0 neighbour
     | state0 ^. remainingK > 1 = do
+        measureMaximumForks (state0 ^. numberOfForks)
         state1 <- updatePC state0 neighbour
-        execP $ state1 & (remainingK      -~ 1)
-                       & (currentThreadId .~ Nothing)
+        execP $ state1 & (remainingK -~ 1) & (currentThreadId .~ Nothing)
     | otherwise =
         finish
-
-    {-nForks <- getNumberOfForks
-    measureMaximumForks nForks
-    when (state0 ^. remainingK > 1) $ do
-        state1 <- updatePC state0 neighbour
-        let state2 = state1 & (remainingK      -~ 1)
-                            & (currentThreadId .~ Nothing)
-        execP state2-}
 
 updatePC :: ExecutionState -> Maybe ((), Node) -> Engine r ExecutionState
 updatePC state Nothing = 
