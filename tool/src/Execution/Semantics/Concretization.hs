@@ -1,6 +1,5 @@
 module Execution.Semantics.Concretization(
       Concretization
-    , concretizes
     , concretize
     , concretizeWithResult
     , concretesOfTypeM
@@ -15,8 +14,9 @@ import           Data.Maybe
 import           Data.Configuration
 import           Data.Positioned
 import           Control.Monad
+import           Control.Applicative
 import           Control.Monad.Extra
-import           Text.Pretty
+import           Text.Pretty (Pretty(toString))
 import           Control.Lens ((&), (^?!), (^.), (%~))
 import           Polysemy.Reader
 import           Polysemy.Error
@@ -39,20 +39,16 @@ import           Verification.Result
 
 type Concretization = M.Map Identifier Expression
 
-concretizes :: [Concretization] -> ExecutionState -> (ExecutionState -> Engine r [ExecutionState]) -> Engine r [ExecutionState]
-concretizes [] state f = f state
-concretizes cs state f = concatForM cs $ \ concretization ->
-    f $ foldr (\ (symRef, concRef) stateN -> stateN & (aliasMap %~ AliasMap.insert symRef (S.singleton concRef))) state (M.toList concretization)
+concretizeWithResult :: [Concretization] -> ExecutionState -> (ExecutionState -> Engine r (ExecutionState, a)) -> Engine r (ExecutionState, a)
+concretizeWithResult [] state f = f state
+concretizeWithResult cs state f = foldr (\ x a -> f (concretize' state x) <|> a) empty cs
 
-concretize  :: [Concretization] -> ExecutionState -> (ExecutionState -> Engine r ExecutionState) -> Engine r [ExecutionState]
-concretize [] state f = (:[]) <$> f state
-concretize cs state f = forM cs $ \ concretization ->
-    f $ foldr (\ (symRef, concRef) stateN -> stateN & (aliasMap %~ AliasMap.insert symRef (S.singleton concRef))) state (M.toList concretization)
+concretize :: [Concretization] -> ExecutionState -> (ExecutionState -> Engine r ExecutionState) -> Engine r ExecutionState
+concretize [] state f = f state
+concretize cs state f = foldr (\ x a -> f (concretize' state x) <|> a) empty cs
 
-concretizeWithResult :: [Concretization] -> ExecutionState -> (ExecutionState -> Engine r (ExecutionState, a)) -> Engine r [(ExecutionState, a)]
-concretizeWithResult [] state f = (:[]) <$> f state
-concretizeWithResult cs state f = forM cs $ \ concretization ->
-    f $ foldr (\ (symRef, concRef) stateN -> stateN & (aliasMap %~ AliasMap.insert symRef (S.singleton concRef))) state (M.toList concretization)
+concretize' :: ExecutionState -> Concretization -> ExecutionState
+concretize' state = foldr (\ (symRef, concRef) stateN -> stateN & (aliasMap %~ AliasMap.insert symRef (S.singleton concRef))) state . M.toList
 
 concretesOfTypeM :: ExecutionState -> RuntimeType -> Maybe Expression -> Engine r (ExecutionState, [Concretization])
 concretesOfTypeM state ty = maybe (return (state, [])) (concretesOfType state ty)
@@ -116,7 +112,7 @@ initializeSymbolicRef :: ExecutionState -> Expression -> Engine r ExecutionState
 initializeSymbolicRef state var@(SymbolicRef ref ty _)
     | AliasMap.member ref (state ^. aliasMap) = 
         return state
-    | ty `isOfType` ARRAYRuntimeType = do
+    | ty `isOfType` ARRAYRuntimeType =
         initializeSymbolicArrays state var
     | otherwise =
         initializeSymbolicObject state var

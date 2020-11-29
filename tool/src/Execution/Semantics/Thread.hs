@@ -3,7 +3,9 @@ module Execution.Semantics.Thread where
 import qualified Data.Stack as T
 import qualified Data.Map as M
 import           Control.Monad (foldM)
-import           Control.Lens ((&), (^.), (%~))
+import           Control.Lens ((&), (^.), (%~), (?~))
+import           Data.Configuration
+import           Text.Pretty
 import           Analysis.CFA.CFG
 import           Execution.Semantics.StackFrame
 import           Execution.Semantics.Exception
@@ -33,13 +35,22 @@ pushStackFrame state0 tid returnPoint member lhs params = do
             let thread1 = thread0 & (callStack %~ T.push frame1)
             return $ updateThreadInState state2 thread1
         Nothing      ->
-            stop state0 "pushStackFrame: cannot get current thread"
+            stop state1 "pushStackFrame: cannot get current thread"
 
 writeParam :: Thread -> (ExecutionState, StackFrame) -> (Parameter, Expression) -> Engine r (ExecutionState, StackFrame)
 writeParam thread (stateN, frameN) (Parameter _ name _, value0)
-    | T.null (thread ^. callStack) = 
+    -- The initial call
+    | T.null (thread ^. callStack) && processTid == (thread ^. parent) = do
+        debug ("Writing parameter '" ++ toString name ++ "'")
         return (stateN, writeDeclarationOnFrame frameN name value0)
+    -- A fork call
+    | processTid /= (thread ^. parent) = do
+        debug ("Writing and evaluating parameter '" ++ toString name ++ "'")
+        (stateN', value1) <- evaluate (stateN & (currentThreadId ?~ (thread ^. parent))) value0
+        return (stateN' & (currentThreadId ?~ (thread ^. tid)), writeDeclarationOnFrame frameN name value1)
+    -- A regular call
     | otherwise = do
+        debug ("Writing and evaluating parameter '" ++ toString name ++ "'")
         (stateN', value1) <- evaluate stateN value0
         return (stateN', writeDeclarationOnFrame frameN name value1)
 

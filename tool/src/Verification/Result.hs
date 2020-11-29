@@ -11,7 +11,6 @@ data VerificationResult
     | Unknown Position [CFGContext]
     | Deadlock [CFGContext]
     | InternalError String
-    | Infeasible
 
 isValid, isInvalid, isUnknown, isDeadlock, isInternalError :: VerificationResult -> Bool
 isValid         result = case result of Valid{}         -> True; _ -> False  
@@ -29,5 +28,4 @@ instance Pretty VerificationResult where
     pretty (Invalid pos _)         = text "INVALID assertion" <+> pretty pos
     pretty (Unknown pos _)         = text "UNKNOWN assertion" <+> pretty pos
     pretty (Deadlock _)            = text "DEADLOCK"
-    pretty Infeasible              = text "INFEASIBLE"
     pretty (InternalError message) = text "INTERNAL ERROR '" <> pretty message <> text "'"

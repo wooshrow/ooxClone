@@ -12,6 +12,7 @@ import           Control.Lens ((^.))
 import           Polysemy
 import           Polysemy.State
 import           Polysemy.Reader
+import           Polysemy.NonDet
 import           Polysemy.Error
 import           Polysemy.Cache       
 import           Control.Monad
@@ -63,6 +64,7 @@ substitute state0 expression = foldExpression algebra expression state0
     where
         algebra :: Members [ Reader (Configuration, ControlFlowGraph, SymbolTable)
                            , Error VerificationResult
+                           , NonDet
                            , Cache Expression
                            , State Statistics
                            , Embed IO] r => ExpressionAlgebra (ExecutionState -> Sem r (ExecutionState, Expression))
@@ -124,6 +126,7 @@ evaluate' state0 expression = foldExpression algebra expression state0
     where
         algebra :: Members [ Reader (Configuration, ControlFlowGraph, SymbolTable)
                            , Error VerificationResult
+                           , NonDet
                            , Cache Expression
                            , State Statistics
                            , Embed IO] r => ExpressionAlgebra (ExecutionState -> Sem r (ExecutionState, Expression))

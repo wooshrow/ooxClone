@@ -23,6 +23,7 @@ import           Analysis.Type.Typeable
 import           Execution.State
 import           Execution.State.Heap as Heap
 import           Execution.State.AliasMap as AliasMap
+import {-# SOURCE #-} Execution.Semantics.Concretization (initializeSymbolicRef)
 import           Language.Syntax
 import           Language.Syntax.DSL
 import qualified Language.Syntax.Lenses as SL
@@ -54,11 +55,12 @@ writeConcreteField state ref field value = do
              stop state ("writeConcreteField: array value '" ++ toString values ++ "'")
 
 writeSymbolicField :: ExecutionState -> Expression -> Identifier -> Expression -> Engine r ExecutionState
-writeSymbolicField state ref@SymbolicRef{} field value =
+writeSymbolicField state0 ref@SymbolicRef{} field value = do
+    state1 <- initializeSymbolicRef state0 ref
     -- TODO: originally, null was removed from the alias map
-    case AliasMap.lookup (ref ^?! SL.var) (state ^. aliasMap) of
-        Just aliases -> foldM writeSymbolicAliasField state (S.filter (/= lit' nullLit') aliases)
-        Nothing      -> stop state "writeSymbolicField: no aliases"
+    case AliasMap.lookup (ref ^?! SL.var) (state1 ^. aliasMap) of
+        Just aliases -> foldM writeSymbolicAliasField state1 (S.filter (/= lit' nullLit') aliases)
+        Nothing      -> stop state1 "writeSymbolicField: no aliases"
     where
         writeSymbolicAliasField :: ExecutionState -> Expression -> Engine r ExecutionState
         writeSymbolicAliasField stateN alias@Ref{} = do
@@ -84,16 +86,17 @@ readConcreteField state ref field = do
              stop state ("readConcreteField: array value '" ++ toString values ++ "'")
 
 readSymbolicField :: ExecutionState -> Expression -> Identifier -> Engine r Expression
-readSymbolicField state ref@SymbolicRef{} field = 
+readSymbolicField state0 ref@SymbolicRef{} field = do
+    state1 <- initializeSymbolicRef state0 ref
     -- TODO: originally, null was removed from the alias map
-    case AliasMap.lookup (ref ^?! SL.var) (state ^. aliasMap) of
+    case AliasMap.lookup (ref ^?! SL.var) (state1 ^. aliasMap) of
         Just aliases -> do
-            options <- mapM readSymbolicAliasField (S.toList (S.filter (/= lit' nullLit') aliases))
+            options <- mapM (readSymbolicAliasField state1) (S.toList (S.filter (/= lit' nullLit') aliases))
             return $ foldr (\ (concRef, value) -> conditional' (ref `equal'` concRef) value) (head options ^. _2) (tail options)
-        Nothing      -> stop state "readSymbolicField: no aliases"
+        Nothing      -> stop state1 "readSymbolicField: no aliases"
     where
-        readSymbolicAliasField :: Expression -> Engine r (Expression, Expression)
-        readSymbolicAliasField ref = (ref, ) <$> readConcreteField state (ref ^?! SL.ref) field
+        readSymbolicAliasField :: ExecutionState -> Expression -> Engine r (Expression, Expression)
+        readSymbolicAliasField state ref = (ref, ) <$> readConcreteField state (ref ^?! SL.ref) field
 
 readSymbolicField state _ _ =
     stop state "readSymbolicField: non-reference"

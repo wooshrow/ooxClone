@@ -10,15 +10,16 @@ import           Polysemy.Reader
 import           Polysemy.Cache hiding (Store, Contains)
 import           Polysemy.Error hiding (Throw)    
 import           Polysemy.State
+import           Polysemy.NonDet
 import           Control.Monad hiding (guard)
-import           Control.Monad.Extra
+import           Control.Applicative
 import           Control.Lens ((&), (^?!), (^.), (%~), (-~), (.~), (?~), Field1(_1), Field2(_2))
 import           Data.Configuration
 import           Data.Error
 import           Data.Statistics
 import           Language.Syntax
 import qualified Language.Syntax.Lenses as SL
-import           Text.Pretty
+import           Text.Pretty (Pretty(toString))
 import           Analysis.CFA.CFG
 import           Analysis.SymbolTable
 import           Execution.Semantics
@@ -40,17 +41,22 @@ execute table cfg = do
     case S.toList symbols of
         [symbol] -> do
             let initialMethod = getMember symbol
-            result <- runReader (config, cfg, table) (runError (evalCache (start emptyState initialMethod)))
+            result <- test config cfg table initialMethod
             case result of
                 Left res -> return res
-                Right () -> return Valid
+                Right _  -> return Valid
         _        -> throw (unknownEntryPointError entryPoint)
 
-start :: ExecutionState -> DeclarationMember -> Engine r ()
+test :: Members [State Statistics, Embed IO] r => 
+    Configuration -> ControlFlowGraph -> SymbolTable -> DeclarationMember -> Sem r (Either VerificationResult [ExecutionState])
+test config cfg table method =
+    runError (runNonDet (evalCache (runReader (config, cfg, table) (start emptyState method))))
+
+start :: ExecutionState -> DeclarationMember -> Engine r ExecutionState
 start state0 initialMethod = do
     (config, cfg, _) <- ask
     let state1 = state0 & remainingK .~ maximumDepth config & currentThreadId ?~ processTid
-    let entry = context cfg (initialMethod ^?! SL.labels ^. _1) ^. _2
+    let entry  = context cfg (initialMethod ^?! SL.labels ^. _1) ^. _2
     (state2, tid) <- execFork state1 entry initialMethod arguments
     debug ("Spawning initial thread with thread id '" ++ toString tid ++ "'")
     let state3 = state2 & (currentThreadId ?~ tid)
@@ -58,8 +64,8 @@ start state0 initialMethod = do
     case initialMethod ^?! SL.specification ^. SL.requires of
         Nothing         -> execP state3
         Just assumption -> do
-            states <- execAssume state3 assumption
-            branch_ execP states
+            state4 <- execAssume state3 assumption
+            execP state4
     where
         -- TODO: add support for non-static and constructors
         arguments            = map createArgument (initialMethod ^?! SL.params)
@@ -69,7 +75,7 @@ start state0 initialMethod = do
 -- Process Execution 
 
 -- | Symbolically executes the program.
-execP :: ExecutionState -> Engine r ()
+execP :: ExecutionState -> Engine r ExecutionState
 execP state0 = do
     let allThreads = state0 ^. threads
     if null allThreads 
@@ -80,19 +86,19 @@ execP state0 = do
             config            <- askConfig
             if applyRandomInterleaving config
                 then 
-                    branch_ (\ thread -> execT (state1 & (currentThreadId ?~ (thread ^. tid))) (thread ^. pc)) threads
+                    branch (\ thread -> execT (state1 & (currentThreadId ?~ (thread ^. tid))) (thread ^. pc)) threads
                 else do
                     shuffledThreads <- embed (shuffleM threads)
-                    branch_ (\ thread -> execT (state1 & (currentThreadId ?~ (thread ^. tid))) (thread ^. pc)) shuffledThreads
+                    branch (\ thread -> execT (state1 & (currentThreadId ?~ (thread ^. tid))) (thread ^. pc)) shuffledThreads
 
 --------------------------------------------------------------------------------
 -- Thread Execution
 
 -- | Symbolically executes the thread.
-execT :: ExecutionState -> CFGContext -> Engine r ()
+execT :: ExecutionState -> CFGContext -> Engine r ExecutionState
 execT state (_, _, ExceptionalNode, _) = do
-    states <- execException state
-    branch_ (uncurry stepM) states
+    state1 <- execException state
+    uncurry stepM state1
 
 -- A Method Call
 execT state0 (_, _, CallNode entry method@Method{} thisInfo arguments lhs, [(_, neighbour)]) = do
@@ -111,17 +117,17 @@ execT state0 (_, _, CallNode{}, ns) =
 -- A Fork
 execT state0 (_, _, ForkNode entry method arguments, neighbours) = do
     (state1, _) <- execFork state0 entry method arguments
-    branch_ (step state1) neighbours
+    branch (step state1) neighbours
 
 -- A Member Entry
 execT state0 (_, _, MemberEntry{}, neighbours) = do
-    states <- execMemberEntry state0
-    branch_ ( \ state1 -> branch_ (step state1) neighbours) states
+    state1 <- execMemberEntry state0
+    branch (step state1) neighbours
 
 -- A Member Exit
 execT state0 (_, _, MemberExit returnTy _ _ _, []) = do
-    states <- execMemberExit state0 returnTy
-    branch_ (uncurry stepM) states
+    state1 <- execMemberExit state0 returnTy
+    uncurry stepM state1
 
 execT state0 (_, _, MemberExit{}, neighbours) =
     stop state0 ("execT: there should be exactly 0 neighbour, there are '" ++ show (length neighbours) ++ "'")
@@ -129,21 +135,21 @@ execT state0 (_, _, MemberExit{}, neighbours) =
 -- A Try Entry
 execT state0 (_, _, TryEntry handler, neighbours) = do
     state1 <- execTryEntry state0 handler
-    branch_ (step state1) neighbours 
+    branch (step state1) neighbours 
 
 -- A Try Exit
 execT state0 (_, _, TryExit, neighbours) = do
     state1 <- execTryExit state0
-    branch_ (step state1) neighbours
+    branch (step state1) neighbours
 
 -- A Catch Entry
 execT state0 (_, _, CatchEntry, neighbours) = do
     state1 <- execCatchEntry state0
-    branch_ (step state1) neighbours
+    branch (step state1) neighbours
 
 -- A Catch Exit
 execT state (_, _, CatchExit, neighbours) =
-    branch_ (step state) neighbours
+    branch (step state) neighbours
 
 --------------------------------------------------------------------------------
 -- Statement Execution
@@ -151,53 +157,60 @@ execT state (_, _, CatchExit, neighbours) =
 -- A Declare Statement
 execT state0 (_, _, StatNode (Declare ty var _ _), neighbours) = do
     state1 <- execDeclare state0 ty var
-    branch_ (step state1) neighbours
+    branch (step state1) neighbours
 
 execT state0 (_, _, StatNode (Assign lhs rhs _ _), neighbours) = do
-    states <- execAssign state0 lhs rhs
-    branch_ (\ state1 -> branch_ (step state1) neighbours) states
+    state1 <- execAssign state0 lhs rhs
+    branch (step state1) neighbours
 
 -- An Assert statement
 execT state0 (_, _, StatNode (Assert assertion _ _), neighbours) = do
-    states <- execAssert state0 assertion
-    branch_ (\ state1 -> branch_ (step state1) neighbours) states
+    state1 <- execAssert state0 assertion
+    branch (step state1) neighbours
 
 -- An Assume statement
 execT state0 (_, _, StatNode (Assume assumption _ _), neighbours) = do
-    states <- execAssume state0 assumption
-    branch_ (\ state1 -> branch_ (step state1) neighbours) states
+    state1 <- execAssume state0 assumption
+    branch (step state1) neighbours
 
 -- A Return Statement
 execT state0 (_, _, StatNode (Return expression _ _), neighbours) = do
-    states <- execReturn state0 expression
-    branch_ (\ state1 -> branch_ (step state1) neighbours) states
+    state1 <- execReturn state0 expression
+    branch (step state1) neighbours
 
 -- A Lock Statement
 execT state0 (_, _, StatNode (Lock var _ _), neighbours) = do
-    states <- execLock state0 var
-    branch_ ( \ state1 -> branch_ (step state1) neighbours) states
+    state1 <- execLock state0 var
+    branch (step state1) neighbours
 
 -- An unlock Statement
 execT state0 (_, _, StatNode (Unlock var _ _), neighbours) = do
     state1 <- execUnlock state0 var
-    branch_ (step state1) neighbours
+    branch (step state1) neighbours
 
 -- Any other Statement
 execT state (_, _, StatNode _, neighbours) =
-    branch_ (step state) neighbours
+    branch (step state) neighbours
 
-step :: ExecutionState -> ((), Node) -> Engine r ()
+step :: ExecutionState -> ((), Node) -> Engine r ExecutionState
 step state = stepM state . Just
 
-stepM :: ExecutionState -> Maybe ((), Node) -> Engine r ()
-stepM state0 neighbour =
-    --nForks <- getNumberOfForks
-    --measureMaximumForks nForks
+stepM :: ExecutionState -> Maybe ((), Node) -> Engine r ExecutionState
+stepM state0 neighbour
+    | state0 ^. remainingK > 1 = do
+        state1 <- updatePC state0 neighbour
+        execP $ state1 & (remainingK      -~ 1)
+                       & (currentThreadId .~ Nothing)
+    | otherwise =
+        finish
+
+    {-nForks <- getNumberOfForks
+    measureMaximumForks nForks
     when (state0 ^. remainingK > 1) $ do
         state1 <- updatePC state0 neighbour
         let state2 = state1 & (remainingK      -~ 1)
                             & (currentThreadId .~ Nothing)
-        execP state2
+        execP state2-}
 
 updatePC :: ExecutionState -> Maybe ((), Node) -> Engine r ExecutionState
 updatePC state Nothing = 
@@ -216,12 +229,7 @@ updatePC state (Just (_, node)) = do
 -- Brancing functions
 --------------------------------------------------------------------------------
 
-branch :: Foldable t => (a -> Engine r b) -> t a -> Engine r [b]
+branch :: (Foldable f, Alternative f) => (a -> Engine r b) -> f a -> Engine r b
 branch f options = do
     measureBranches options
-    foldM' (\ acc value -> do
-        result <- catch ((:[]) <$> f value) (\ e -> [] <$ haltInfeasible e)
-        return $ result ++ acc) [] (toList options)
-
-branch_ :: Foldable t => (a -> Engine r ()) -> t a -> Engine r ()
-branch_ f = void . branch f
+    foldr (\ x a -> f x <|> a) empty options
