@@ -18,7 +18,6 @@ module Execution.Effects(
 ) where
 
 import Polysemy
-import Polysemy.Bundle
 import Polysemy.Error
 import Polysemy.Cache
 import Polysemy.State
@@ -34,7 +33,7 @@ import Text.Pretty (toString)
 import Data.Statistics
 import Analysis.CFA.CFG
 import Analysis.SymbolTable
-import Verification.Result
+import Execution.Result
 import Language.Syntax
 
 type Engine r a = Members [ Reader (Configuration, ControlFlowGraph, SymbolTable)

@@ -3,7 +3,6 @@ module Execution.Semantics.StackFrame where
 import qualified Data.Stack as T
 import qualified Data.Map as M
 import           Text.Pretty
-import           Data.Configuration
 import           Control.Lens ((&), (^.), (%~))
 import           Execution.Effects
 import           Execution.State

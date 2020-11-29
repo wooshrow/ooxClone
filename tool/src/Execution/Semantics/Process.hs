@@ -8,7 +8,6 @@ import qualified Data.Stack as T
 import qualified Data.Set as S
 import           Analysis.CFA.CFG
 import           Control.Lens ((&), (^?!), (^.), (%~), (+~), (.~))
-import           Data.Configuration
 import           Execution.Semantics.Thread
 import           Execution.Effects
 import           Execution.State

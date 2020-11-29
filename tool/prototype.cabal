@@ -46,8 +46,8 @@ executable app
                           , Execution.State.AliasMap
                           , Execution.State.Heap
                           , Execution.State.InterleavingConstraints
-                          , Verification.Result
-                          , Verification.Verifier
+                          , Execution.Result
+                          , Execution.Verification
                           , Data.Positioned
                           , Data.Error
                           , Data.Configuration

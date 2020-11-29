@@ -11,7 +11,7 @@ import Data.Statistics
 import Analysis.CFA.CFG
 import Analysis.SymbolTable
 import Execution.Engine
-import Verification.Result
+import Execution.Result
 import Text.Pretty
 
 executionPhase :: Members [Error ErrorMessage, State Statistics, Trace, Reader Configuration, Embed IO] r 

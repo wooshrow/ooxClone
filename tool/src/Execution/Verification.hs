@@ -1,4 +1,4 @@
-module Verification.Verifier(
+module Execution.Verification(
       verifyM
     , verify
 ) where
@@ -18,7 +18,7 @@ import           Text.Pretty
 import           Data.Positioned
 import           Data.Statistics
 import           Data.Configuration
-import           Verification.Result
+import           Execution.Result
 import           Analysis.CFA.CFG
 import           Execution.State.AliasMap as AliasMap
 import           Language.Syntax

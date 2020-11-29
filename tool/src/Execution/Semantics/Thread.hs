@@ -4,7 +4,6 @@ import qualified Data.Stack as T
 import qualified Data.Map as M
 import           Control.Monad (foldM)
 import           Control.Lens ((&), (^.), (%~), (?~))
-import           Data.Configuration
 import           Text.Pretty
 import           Analysis.CFA.CFG
 import           Execution.Semantics.StackFrame
@@ -45,7 +44,7 @@ writeParam thread (stateN, frameN) (Parameter _ name _, value0)
         debug ("Writing parameter '" ++ toString name ++ "'")
         return (stateN, writeDeclarationOnFrame frameN name value0)
     -- A fork call
-    | processTid /= (thread ^. parent) = do
+    | T.null (thread ^. callStack) && processTid /= (thread ^. parent) = do
         debug ("Writing and evaluating parameter '" ++ toString name ++ "'")
         (stateN', value1) <- evaluate (stateN & (currentThreadId ?~ (thread ^. parent))) value0
         return (stateN' & (currentThreadId ?~ (thread ^. tid)), writeDeclarationOnFrame frameN name value1)

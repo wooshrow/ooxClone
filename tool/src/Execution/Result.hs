@@ -1,4 +1,4 @@
-module Verification.Result where
+module Execution.Result where
 
 import Prelude hiding ((<>))
 import Text.Pretty

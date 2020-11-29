@@ -47,7 +47,7 @@ import           Execution.State.Heap
 import           Execution.State.PathConstraints as PathConstraints
 import           Execution.State.LockSet as LockSet
 import           Execution.State.AliasMap as AliasMap
-import           Verification.Verifier
+import           Execution.Verification
 
 execAssert :: ExecutionState -> Expression -> Engine r ExecutionState
 execAssert state0 assertion = do

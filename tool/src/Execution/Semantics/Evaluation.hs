@@ -13,7 +13,6 @@ import           Control.Monad
 import           Text.Pretty
 import           Data.Configuration
 import           Data.Statistics
-import           Verification.Result
 import           Analysis.CFA.CFG
 import           Analysis.SymbolTable
 import           Logger
@@ -24,6 +23,7 @@ import           Execution.Effects
 import           Execution.State
 import           Execution.State.Heap
 import           Execution.State.AliasMap as AliasMap
+import           Execution.Result
 import           Data.Positioned
 import           Language.Syntax
 import           Language.Syntax.Fold
@@ -136,7 +136,7 @@ evaluate' state0 expression = foldExpression algebra expression state0
             , fBinOp = \ binOp lhs0 rhs0 ty pos state1 -> do
                 (state2, lhs1) <- lhs0 state1
                 (state3, rhs1) <- rhs0 state2
-                value <- evaluateBinOp binOp lhs1 rhs1 ty pos
+                value <- evaluateBinOp state1 binOp lhs1 rhs1 ty pos
                 return (state3, value)
                 
             , fUnOp = \ unOp value0 ty pos state1 -> do
@@ -173,12 +173,12 @@ evaluate' state0 expression = foldExpression algebra expression state0
                                             size <- fmap (lit' . intLit') (sizeof state1 ref)
                                             return (state1, size)
                                         _                ->
-                                            throw (InternalError "evaluate: no aliases")
+                                            stop state1 "evaluate: no aliases"
                                 else 
-                                    throw (InternalError "evaluate: SizeOf of symbolic reference")
+                                    stop state1 "evaluate: SizeOf of symbolic reference"
                             _            ->
-                                throw (InternalError "evaluate: no aliases")
-                    _                  -> throw (InternalError "evaluate: SizeOf of non-reference")
+                                stop state1 "evaluate: no aliases"
+                    _                  -> stop state1 "evaluate: SizeOf of non-reference"
 
             , fRef = \ ref ty pos state1 -> 
                 return (state1, Ref ref ty pos)
@@ -215,23 +215,23 @@ evaluateQuantifier quantifier element range domain formula _ _ state0 = do
             -- TODO: the alias map needs to be extracted from formulas and passed on
             evaluate state0 (quantifier (map snd formulas))
 
-evaluateBinOp :: BinOp -> Expression -> Expression ->  RuntimeType -> Position -> Engine r Expression
+evaluateBinOp :: ExecutionState -> BinOp -> Expression -> Expression ->  RuntimeType -> Position -> Engine r Expression
 -- Boolean Evaluation
-evaluateBinOp op (Lit (BoolLit a _) _ _) (Lit (BoolLit b _) _ _) ty pos = do
+evaluateBinOp state op (Lit (BoolLit a _) _ _) (Lit (BoolLit b _) _ _) ty pos = do
     lit <- case op of Implies  -> return (BoolLit (not a || b)); And   -> return (BoolLit (a && b))
                       Or       -> return (BoolLit (a || b))    ; Equal -> return (BoolLit (a == b))
                       NotEqual -> return (BoolLit (a /= b))    
-                      _        -> throw (InternalError "evaluateBinOp: unsupported operator")
+                      _        -> stop state "evaluateBinOp: unsupported operator"
     return $ Lit (lit pos) ty pos
 
-evaluateBinOp op expressionA@(Lit (BoolLit a _) _ _) expressionB ty pos =
+evaluateBinOp __ op expressionA@(Lit (BoolLit a _) _ _) expressionB ty pos =
     return $ case op of 
         Implies -> if a then expressionB else Lit (BoolLit True pos) ty pos
         And     -> if a then expressionB else Lit (BoolLit False pos) ty pos
         Or      -> if a then Lit (BoolLit True pos) ty pos else expressionB
         _       -> BinOp op expressionA expressionB ty pos
         
-evaluateBinOp op expressionA expressionB@(Lit (BoolLit b _) _ _) ty pos =
+evaluateBinOp _ op expressionA expressionB@(Lit (BoolLit b _) _ _) ty pos =
     return $ case op of 
         Implies -> if b then Lit (BoolLit True pos) ty pos else UnOp Negate expressionA ty pos
         And     -> if b then expressionA else Lit (BoolLit False pos) ty pos
@@ -239,54 +239,54 @@ evaluateBinOp op expressionA expressionB@(Lit (BoolLit b _) _ _) ty pos =
         _       -> BinOp op expressionA expressionB ty pos
 
 -- Integer Evaluation
-evaluateBinOp Divide _ (Lit (IntLit 0 _) _ _) _ _ = infeasible
-evaluateBinOp Modulo _ (Lit (IntLit 0 _) _ _) _ _ = infeasible
-evaluateBinOp op (Lit (IntLit a _) _ _) (Lit (IntLit b _) _ _) ty pos = do
+evaluateBinOp _ Divide _ (Lit (IntLit 0 _) _ _) _ _ = infeasible
+evaluateBinOp _ Modulo _ (Lit (IntLit 0 _) _ _) _ _ = infeasible
+evaluateBinOp state op (Lit (IntLit a _) _ _) (Lit (IntLit b _) _ _) ty pos = do
     lit <- case op of Equal       -> return (BoolLit (a == b))  ; NotEqual         -> return (BoolLit (a /= b))
                       LessThan    -> return (BoolLit (a < b))   ; LessThanEqual    -> return (BoolLit (a <= b))
                       GreaterThan -> return (BoolLit (a > b))   ; GreaterThanEqual -> return (BoolLit (a >= b))
                       Plus        -> return (IntLit  (a + b))   ; Minus            -> return (IntLit  (a - b))
                       Multiply    -> return (IntLit  (a * b))   ; Divide           -> return (IntLit (a `div` b))
                       Modulo      -> return (IntLit (a `mod` b))
-                      _           -> throw (InternalError "evaluateBinOp: unsupported operator")
+                      _           -> stop state "evaluateBinOp: unsupported operator"
     return $ Lit (lit pos) ty pos
 
 -- Reference Evaluation
-evaluateBinOp op (Ref a _ _) (Ref b _ _) ty pos = do
+evaluateBinOp state op (Ref a _ _) (Ref b _ _) ty pos = do
     lit <- case op of Equal    -> return (BoolLit (a == b)) 
                       NotEqual -> return (BoolLit (a /= b))
-                      _        -> throw (InternalError "evaluateBinOp: unsupported operator")
+                      _        -> stop state "evaluateBinOp: unsupported operator"
     return $ Lit (lit pos) ty pos
     
-evaluateBinOp op Ref{} (Lit (NullLit _) _ _) ty pos = do
+evaluateBinOp state op Ref{} (Lit (NullLit _) _ _) ty pos = do
     lit <- case op of Equal    -> return (BoolLit False)
                       NotEqual -> return (BoolLit True)
-                      _        -> throw (InternalError "evaluateBinOp: unsupported operator")
+                      _        -> stop state "evaluateBinOp: unsupported operator"
     return $ Lit (lit pos) ty pos
 
-evaluateBinOp op (Lit (NullLit _) _ _)  Ref{} ty pos = do
+evaluateBinOp state op (Lit (NullLit _) _ _)  Ref{} ty pos = do
     lit <- case op of Equal    -> return (BoolLit False)
                       NotEqual -> return (BoolLit True)
-                      _        -> throw (InternalError "evaluateBinOp: unsupported operator")
+                      _        -> stop state "evaluateBinOp: unsupported operator"
     return $ Lit (lit pos) ty pos
 
-evaluateBinOp op (Lit (NullLit _) _ _) (Lit (NullLit _) _ _) ty pos = do
+evaluateBinOp state op (Lit (NullLit _) _ _) (Lit (NullLit _) _ _) ty pos = do
     lit <- case op of Equal    -> return (BoolLit True)
                       NotEqual -> return (BoolLit False)
-                      _        -> throw (InternalError "evaluateBinOp: unsupported operator")
+                      _        -> stop state "evaluateBinOp: unsupported operator"
     return $ Lit (lit pos) ty pos
 
-evaluateBinOp op expressionA@(SymbolicRef a _ _) expressionB@(SymbolicRef b _ _) ty pos
+evaluateBinOp state op expressionA@(SymbolicRef a _ _) expressionB@(SymbolicRef b _ _) ty pos
     | a == b 
         = case op of
                 Equal    -> return $ Lit (BoolLit True pos) ty pos
                 NotEqual -> return $ Lit (BoolLit False pos) ty pos
-                _        -> throw (InternalError "evaluateBinOp: unsupported operator")
+                _        -> stop state "evaluateBinOp: unsupported operator"
     | otherwise
         = return $ BinOp op expressionA expressionB ty pos
 
 -- Default Evaluation
-evaluateBinOp op expressionA expressionB ty pos =
+evaluateBinOp _ op expressionA expressionB ty pos =
     return $ BinOp op expressionA expressionB ty pos
 
 evaluateUnOp :: UnOp -> Expression -> RuntimeType -> Position -> Engine r Expression

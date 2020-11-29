@@ -11,11 +11,11 @@ import Data.Time.Clock
 import Data.Error
 import Data.Configuration
 import Data.Statistics
-import Text.Pretty          (toString)
+import Text.Pretty (toString)
 import Parsing.Phase
 import Analysis.Phase
 import Execution.Phase
-import Verification.Result
+import Execution.Result
 
 allPhases :: Members [Reader Configuration, State Statistics, Error ErrorMessage, Embed IO] r 
     => Sem r VerificationResult

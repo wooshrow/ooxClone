@@ -3,7 +3,6 @@ module Execution.Engine(
 ) where
 
 import qualified Data.Set as S
-import           Data.Foldable
 import           System.Random.Shuffle
 import           Control.Monad hiding (guard)
 import           Control.Applicative
@@ -23,7 +22,7 @@ import           Execution.Semantics.PartialOrderReduction
 import           Execution.Effects
 import           Execution.State
 import           Execution.State.Thread
-import           Verification.Result
+import           Execution.Result
 
 --------------------------------------------------------------------------------
 -- Symbolic Execution

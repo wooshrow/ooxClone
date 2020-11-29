@@ -2,7 +2,6 @@ module Execution.Semantics.Exception where
 
 import qualified Data.Stack as T
 import           Analysis.CFA.CFG
-import           Data.Configuration
 import           Control.Lens ((&), (^.), (%~))
 import           Execution.Effects
 import           Execution.State

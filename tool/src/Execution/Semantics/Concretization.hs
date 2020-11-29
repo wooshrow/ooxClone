@@ -30,7 +30,6 @@ import           Execution.State.Heap
 import           Execution.State.AliasMap as AliasMap
 import           Execution.Semantics.Heap
 import           Execution.Semantics.StackFrame
-import           Verification.Result
 
 --------------------------------------------------------------------------------
 -- Concretization
@@ -64,7 +63,7 @@ concretesOfType state0 ty formula
                 let mappings = map (\ ref -> map (ref ^?! SL.var, ) (S.toList (fromMaybe (error "concretesOfType") (AliasMap.lookup (ref ^?! SL.var) (state1 ^. aliasMap))))) (S.toList refs)
                 return (state1, map M.fromList (sequence mappings))
     | otherwise =
-        throw (InternalError "concretesOfType: cannot get current thread")
+        stop state0 "concretesOfType: cannot get current thread"
 
 findSymbolicRefsOfType :: ExecutionState -> RuntimeType -> Expression -> Engine r (S.Set Expression)
 findSymbolicRefsOfType state ty = foldExpression algebra
