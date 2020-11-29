@@ -4,6 +4,7 @@ import Polysemy
 import Polysemy.State
 import Polysemy.Error
 import Polysemy.Reader
+import Polysemy.Trace
 import Control.Monad
 import Options.Applicative
 import Data.Time.Clock
@@ -18,7 +19,7 @@ import Verification.Result
 
 allPhases :: Members [Reader Configuration, State Statistics, Error ErrorMessage, Embed IO] r 
     => Sem r VerificationResult
-allPhases = parsingPhase >>= analysisPhase >>= uncurry executionPhase
+allPhases = traceToIO (parsingPhase >>= analysisPhase >>= uncurry executionPhase)
 
 executeOnce :: Configuration -> IO (VerificationResult, Statistics)
 executeOnce config = do

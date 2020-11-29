@@ -4,6 +4,7 @@ import Polysemy
 import Polysemy.Error
 import Polysemy.State
 import Polysemy.Reader
+import Logger
 import Data.Configuration
 import Data.Error
 import Data.Statistics
@@ -13,7 +14,7 @@ import Execution.Engine
 import Verification.Result
 import Text.Pretty
 
-executionPhase :: Members [Error ErrorMessage, State Statistics, Reader Configuration, Embed IO] r 
+executionPhase :: Members [Error ErrorMessage, State Statistics, Trace, Reader Configuration, Embed IO] r 
     => SymbolTable -> ControlFlowGraph -> Sem r VerificationResult
 executionPhase table cfg = do
     inform "Starting the Symbolic Execution Phase"

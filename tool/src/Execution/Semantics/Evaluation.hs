@@ -16,6 +16,7 @@ import           Data.Statistics
 import           Verification.Result
 import           Analysis.CFA.CFG
 import           Analysis.SymbolTable
+import           Logger
 import           Execution.Semantics.StackFrame
 import           Execution.Semantics.Heap
 import           Execution.Semantics.Concretization
@@ -62,7 +63,8 @@ substitute state0 expression = foldExpression algebra expression state0
                            , NonDet
                            , Cache Expression
                            , State Statistics
-                           , Embed IO] r => ExpressionAlgebra (ExecutionState -> Sem r (ExecutionState, Expression))
+                           , Embed IO
+                           , Trace] r => ExpressionAlgebra (ExecutionState -> Sem r (ExecutionState, Expression))
         algebra = ExpressionAlgebra
             { fForall = evaluateQuantifier ands'
 
@@ -124,7 +126,8 @@ evaluate' state0 expression = foldExpression algebra expression state0
                            , NonDet
                            , Cache Expression
                            , State Statistics
-                           , Embed IO] r => ExpressionAlgebra (ExecutionState -> Sem r (ExecutionState, Expression))
+                           , Embed IO
+                           , Trace] r => ExpressionAlgebra (ExecutionState -> Sem r (ExecutionState, Expression))
         algebra = ExpressionAlgebra
             { fForall = evaluateQuantifier ands'
             

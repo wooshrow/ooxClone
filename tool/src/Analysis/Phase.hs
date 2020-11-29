@@ -8,6 +8,7 @@ import           Polysemy.State
 import           Polysemy.Reader
 import qualified Data.Map                   as M (empty)
 import           Data.Graph.Inductive.Graph as G (empty)
+import           Logger
 import           Data.Configuration
 import           Data.Error
 import           Text.Pretty
@@ -17,7 +18,7 @@ import           Analysis.CFA.Analysis
 import           Analysis.CFA.CFG
 import           Language.Syntax
 
-analysisPhase :: Members [Reader Configuration, Error ErrorMessage, Embed IO] r 
+analysisPhase :: Members [Reader Configuration, Error ErrorMessage, Trace, Embed IO] r 
     => CompilationUnit -> Sem r (SymbolTable, ControlFlowGraph)
 analysisPhase program = do
     inform "Starting the Analysis Phase"

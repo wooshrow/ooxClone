@@ -1,9 +1,5 @@
 module Data.Configuration where
 
-import Polysemy
-import Polysemy.Reader
-import Control.Monad
-
 data Configuration 
     = Configuration 
     { fileName                :: FilePath
@@ -19,7 +15,7 @@ data Configuration
     , applyPOR                :: Bool
     , applyLocalSolver        :: Bool
     , applyRandomInterleaving :: Bool
-    , informationLevel        :: Int
+    , logLevel                :: Int
     , runBenchmark            :: Bool
     }
 
@@ -31,15 +27,3 @@ instance HasConfiguration Configuration where
 
 instance HasConfiguration (Configuration, b, c) where
     configuration (c, _, _) = c
-
-inform :: (HasConfiguration a, Members [Reader a, Embed IO] r) => String -> Sem r ()
-inform message = do
-    Configuration{informationLevel} <- configuration <$> ask
-    when (informationLevel >= 1)
-        (embed (putStrLn message))
-
-debug :: (HasConfiguration a, Members [Reader a, Embed IO] r) => String -> Sem r ()
-debug message = do
-    Configuration{informationLevel} <- configuration <$> ask
-    when (informationLevel >= 2)
-        (embed (putStrLn message))

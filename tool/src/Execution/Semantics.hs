@@ -23,7 +23,6 @@ import           Data.Maybe
 import           Control.Monad (foldM)
 import           Control.Lens ((&), (^?!), (^.), (%~), (<>~))
 import           Control.Monad.Extra
-import           Polysemy.Cache
 import           Text.Pretty
 import           Data.Configuration
 import           Data.Statistics

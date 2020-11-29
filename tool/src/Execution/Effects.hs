@@ -5,6 +5,7 @@ module Execution.Effects(
     , module Polysemy.State
     , module Polysemy.NonDet
     , module Polysemy.Reader
+    , module Logger
     , Engine
     , infeasible
     , stop
@@ -17,6 +18,7 @@ module Execution.Effects(
 ) where
 
 import Polysemy
+import Polysemy.Bundle
 import Polysemy.Error
 import Polysemy.Cache
 import Polysemy.State
@@ -24,6 +26,7 @@ import Polysemy.NonDet
 import Polysemy.Reader
 import Control.Applicative
 import Control.Lens
+import Logger
 import Execution.State
 import Data.Configuration
 import Data.Positioned
@@ -39,6 +42,7 @@ type Engine r a = Members [ Reader (Configuration, ControlFlowGraph, SymbolTable
                           , Cache Expression
                           , State Statistics
                           , NonDet
+                          , Trace
                           , Embed IO] r => Sem r a
 
 -- | Terminate the current branch.

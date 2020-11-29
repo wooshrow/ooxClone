@@ -13,6 +13,7 @@ import           Polysemy.State
 import           Polysemy.Reader
 import           Z3.Monad
 import           Control.Lens
+import           Logger
 import           Text.Pretty
 import           Data.Positioned
 import           Data.Statistics
@@ -31,15 +32,15 @@ type Concretization = M.Map Identifier Expression
 -- Verification Interface
 --------------------------------------------------------------------------------
 
-verifyM  :: (HasConfiguration a, Members [State Statistics, Reader a, Embed IO, Error VerificationResult] r)
+verifyM  :: (HasConfiguration a, Members [State Statistics, Reader a, Embed IO, Trace, Error VerificationResult] r)
     => [CFGContext] -> AliasMap -> Position -> Maybe Expression -> Sem r ()
 verifyM programTrace aliases pos = maybe (return ()) (verify programTrace aliases pos)
 
-verify :: (HasConfiguration a, Members [State Statistics, Reader a, Embed IO, Error VerificationResult] r)
+verify :: (HasConfiguration a, Members [State Statistics, Reader a, Embed IO, Trace, Error VerificationResult] r)
     => [CFGContext] -> AliasMap -> Position -> Expression -> Sem r ()
 verify programTrace aliases pos = void . verifyEach programTrace pos . concretize aliases
 
-verifyEach :: (HasConfiguration a, Members [State Statistics, Reader a, Embed IO, Error VerificationResult] r)
+verifyEach :: (HasConfiguration a, Members [State Statistics, Reader a, Embed IO, Trace, Error VerificationResult] r)
     => [CFGContext] -> Position -> [Expression] -> Sem r Result
 verifyEach _            _   []     = return Unsat
 verifyEach programTrace pos (n:ns) = do

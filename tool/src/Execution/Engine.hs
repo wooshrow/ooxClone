@@ -11,6 +11,7 @@ import           Control.Lens ((&), (^?!), (^.), (%~), (-~), (.~), (?~), Field1(
 import           Data.Configuration
 import           Data.Error
 import           Data.Statistics
+import           Logger
 import           Language.Syntax
 import qualified Language.Syntax.Lenses as SL
 import           Text.Pretty (Pretty(toString))
@@ -28,7 +29,7 @@ import           Verification.Result
 -- Symbolic Execution
 --------------------------------------------------------------------------------
 
-execute :: Members [Reader Configuration, Error ErrorMessage, State Statistics, Embed IO] r
+execute :: Members [Reader Configuration, Error ErrorMessage, State Statistics, Trace, Embed IO] r
     => SymbolTable -> ControlFlowGraph -> Sem r VerificationResult
 execute table cfg = do
     config@Configuration{entryPoint} <- ask
@@ -42,10 +43,9 @@ execute table cfg = do
                 Right _  -> return Valid
         _        -> throw (unknownEntryPointError entryPoint)
 
-test :: Members [State Statistics, Embed IO] r => 
+test :: Members [State Statistics, Trace, Embed IO] r => 
     Configuration -> ControlFlowGraph -> SymbolTable -> DeclarationMember -> Sem r (Either VerificationResult [ExecutionState])
-test config cfg table method =
-    runError (runNonDet (evalCache (runReader (config, cfg, table) (start emptyState method))))
+test config cfg table method = runError (runNonDet (evalCache (runReader (config, cfg, table) (start emptyState method))))
 
 start :: ExecutionState -> DeclarationMember -> Engine r ExecutionState
 start state0 initialMethod = do

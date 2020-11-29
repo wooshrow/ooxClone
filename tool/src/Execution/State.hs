@@ -6,16 +6,13 @@ import           Data.Foldable
 import           Control.Lens
 import           Execution.State.PathConstraints
 import           Execution.State.LockSet
-import Execution.State.Thread ( tid, Thread, ThreadId )
+import           Execution.State.Thread
 import           Execution.State.AliasMap
 import           Execution.State.Heap
 import           Execution.State.InterleavingConstraints
-import           Data.Configuration
-import           Data.Statistics
+import           Text.Pretty
 import           Analysis.CFA.CFG
-import           Analysis.SymbolTable
 import           Analysis.Type.Typeable
-import           Verification.Result
 import           Language.Syntax
 import           Language.Syntax.DSL
 
