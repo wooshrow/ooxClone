@@ -29,6 +29,7 @@ executable app
                           , Analysis.CFA.Analysis
                           , Execution.Phase
                           , Execution.Engine
+                          , Execution.Effects
                           , Execution.Semantics
                           , Execution.Semantics.Concretization
                           , Execution.Semantics.StackFrame
