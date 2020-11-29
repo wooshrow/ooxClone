@@ -5,12 +5,6 @@ module Execution.Engine(
 import qualified Data.Set as S
 import           Data.Foldable
 import           System.Random.Shuffle
-import           Polysemy              
-import           Polysemy.Reader
-import           Polysemy.Cache hiding (Store, Contains)
-import           Polysemy.Error hiding (Throw)    
-import           Polysemy.State
-import           Polysemy.NonDet
 import           Control.Monad hiding (guard)
 import           Control.Applicative
 import           Control.Lens ((&), (^?!), (^.), (%~), (-~), (.~), (?~), Field1(_1), Field2(_2))

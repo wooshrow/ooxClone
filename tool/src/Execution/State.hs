@@ -3,16 +3,7 @@ module Execution.State where
 import           Prelude hiding ((<>))
 import qualified Data.Set                 as S
 import           Data.Foldable
-import           Data.Positioned
 import           Control.Lens
-import           Control.Applicative (empty)
-import           Polysemy           
-import           Polysemy.Reader
-import           Polysemy.Error 
-import           Polysemy.NonDet 
-import           Polysemy.State
-import           Polysemy.Cache
-import           Text.Pretty (($+$), (<>), text, Pretty(toString, pretty))
 import           Execution.State.PathConstraints
 import           Execution.State.LockSet
 import Execution.State.Thread ( tid, Thread, ThreadId )

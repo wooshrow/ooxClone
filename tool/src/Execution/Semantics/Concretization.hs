@@ -18,8 +18,6 @@ import           Control.Applicative
 import           Control.Monad.Extra
 import           Text.Pretty (Pretty(toString))
 import           Control.Lens ((&), (^?!), (^.), (%~))
-import           Polysemy.Reader
-import           Polysemy.Error
 import           Language.Syntax
 import           Language.Syntax.Fold
 import           Language.Syntax.DSL

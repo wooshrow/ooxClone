@@ -8,13 +8,7 @@ module Execution.Semantics.Evaluation(
 ) where
 
 import qualified Data.Set as S
-import           Control.Lens ((^.))
-import           Polysemy
-import           Polysemy.State
-import           Polysemy.Reader
-import           Polysemy.NonDet
-import           Polysemy.Error
-import           Polysemy.Cache       
+import           Control.Lens ((^.)) 
 import           Control.Monad
 import           Text.Pretty
 import           Data.Configuration
