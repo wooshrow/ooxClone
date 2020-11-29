@@ -41,6 +41,7 @@ import           Execution.Semantics.Concretization
 import           Execution.Semantics.StackFrame
 import           Execution.Semantics.Heap
 import           Execution.Semantics.Process
+import           Execution.Effects
 import           Execution.State
 import           Execution.State.Thread
 import           Execution.State.Heap

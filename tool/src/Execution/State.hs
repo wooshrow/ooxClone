@@ -12,7 +12,7 @@ import           Polysemy.Error
 import           Polysemy.NonDet 
 import           Polysemy.State
 import           Polysemy.Cache
-import Text.Pretty (($+$), (<>), text, Pretty(toString, pretty))
+import           Text.Pretty (($+$), (<>), text, Pretty(toString, pretty))
 import           Execution.State.PathConstraints
 import           Execution.State.LockSet
 import Execution.State.Thread ( tid, Thread, ThreadId )
@@ -64,13 +64,6 @@ emptyState = ExecutionState { _threads                 = mempty
                             , _programTrace            = mempty
                             , _remainingK              = 0 }
 
-type Engine r a = Members [ Reader (Configuration, ControlFlowGraph, SymbolTable)
-                          , Error VerificationResult
-                          , Cache Expression
-                          , State Statistics
-                          , NonDet
-                          , Embed IO] r => Sem r a
-
 updateThreadInState :: ExecutionState -> Thread -> ExecutionState
 updateThreadInState state thread = state & (threads %~ S.insert thread)
 
@@ -83,51 +76,11 @@ defaultValue ty = lit' $
         ARRAYRuntimeType  -> nullLit'      ; ArrayRuntimeType{}     -> nullLit'
         StringRuntimeType -> nullLit'      
 
---------------------------------------------------------------------------------
--- Exploration utility functions
---------------------------------------------------------------------------------
-
--- | Terminate the current branch.
-infeasible :: Engine r a
-infeasible = measurePrune >> empty -- throw Infeasible
-
--- | Terminate with an internal error.
-stop :: ExecutionState -> String -> Engine r a
-stop state message = do
-    debug ("Stopping with state: \n" ++ toString state)
-    throw $ InternalError message
-
--- | Terminate with an invalid expression.
-invalid :: ExecutionState -> Expression -> Engine r a
-invalid state expression = 
-    throw $ Invalid (getPos expression) (state ^. programTrace)
-
--- | Terminate with a deadlock.
-deadlock :: ExecutionState -> Engine r a
-deadlock state = throw $ Deadlock (state ^. programTrace)
-
--- | Terminate the current branch.
-finish :: Engine r a
-finish = measureFinish >> empty
-
---------------------------------------------------------------------------------
--- Effect utilities
---------------------------------------------------------------------------------
-
 getThread :: ExecutionState -> ThreadId -> Maybe Thread
 getThread state tid' = find (\ thread -> thread ^. tid == tid') (state ^. threads)
 
 getCurrentThread :: ExecutionState -> Maybe Thread
 getCurrentThread state = do
-    let allThreads = state ^. threads
     currentTid <- state ^. currentThreadId
-    find (\ thread -> thread ^. tid == currentTid) allThreads
+    getThread state currentTid
 
-askConfig :: Engine r Configuration
-askConfig = (^. _1) <$> ask
-
-askCFG :: Engine r ControlFlowGraph
-askCFG = (^. _2) <$> ask
-
-askTable :: Engine r SymbolTable
-askTable = (^. _3) <$> ask

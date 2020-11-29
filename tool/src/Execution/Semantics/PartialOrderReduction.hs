@@ -8,6 +8,7 @@ import           Control.Lens ((&), (^?!), (^.), (.~), (?~))
 import           Control.Monad
 import           Text.Pretty
 import           Data.Configuration
+import           Execution.Effects
 import           Execution.State
 import           Execution.State.Thread
 import           Execution.State.LockSet as LockSet

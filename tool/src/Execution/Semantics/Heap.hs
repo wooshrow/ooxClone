@@ -20,6 +20,7 @@ import           Text.Pretty
 import           Control.Lens ((&), (^?!), (^.), (%~), (.~), element, Field2(_2))
 import           Data.Positioned
 import           Analysis.Type.Typeable
+import           Execution.Effects
 import           Execution.State
 import           Execution.State.Heap as Heap
 import           Execution.State.AliasMap as AliasMap

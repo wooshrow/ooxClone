@@ -10,6 +10,7 @@ import           Analysis.CFA.CFG
 import           Execution.Semantics.StackFrame
 import           Execution.Semantics.Exception
 import           Execution.Semantics.Evaluation
+import           Execution.Effects
 import           Execution.State
 import           Execution.State.Thread
 import           Language.Syntax

@@ -10,6 +10,7 @@ import           Analysis.CFA.CFG
 import           Control.Lens ((&), (^?!), (^.), (%~), (+~), (.~))
 import           Data.Configuration
 import           Execution.Semantics.Thread
+import           Execution.Effects
 import           Execution.State
 import           Execution.State.Thread
 import           Language.Syntax

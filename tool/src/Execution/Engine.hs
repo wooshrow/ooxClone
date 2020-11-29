@@ -25,6 +25,7 @@ import           Analysis.SymbolTable
 import           Execution.Semantics
 import           Execution.Semantics.Concretization
 import           Execution.Semantics.PartialOrderReduction
+import           Execution.Effects
 import           Execution.State
 import           Execution.State.Thread
 import           Verification.Result

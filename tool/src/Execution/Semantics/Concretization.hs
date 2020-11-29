@@ -26,6 +26,7 @@ import           Language.Syntax.DSL
 import qualified Language.Syntax.Lenses as SL
 import           Analysis.Type.Typeable
 import           Analysis.SymbolTable
+import           Execution.Effects
 import           Execution.State
 import           Execution.State.Heap
 import           Execution.State.AliasMap as AliasMap

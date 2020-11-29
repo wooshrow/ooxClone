@@ -5,6 +5,7 @@ import qualified Data.Map as M
 import           Text.Pretty
 import           Data.Configuration
 import           Control.Lens ((&), (^.), (%~))
+import           Execution.Effects
 import           Execution.State
 import           Execution.State.Thread
 import           Language.Syntax
