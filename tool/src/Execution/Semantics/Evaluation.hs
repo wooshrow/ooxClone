@@ -163,7 +163,8 @@ evaluate' state0 expression = foldExpression algebra expression state0
                         size <- fmap (lit' . intLit') (sizeof state1 ref)
                         return (state1, size)
                     SymbolicRef ref _ _ ->
-                        case AliasMap.lookup ref (state1 ^. aliasMap) of
+                        stop state1 "evaluate: SizeOf of symbolic reference"
+                        {-case AliasMap.lookup ref (state1 ^. aliasMap) of
                             Just aliases -> if S.size aliases == 1
                                 then 
                                     case S.elemAt 0 aliases of
@@ -177,7 +178,7 @@ evaluate' state0 expression = foldExpression algebra expression state0
                                 else 
                                     stop state1 "evaluate: SizeOf of symbolic reference"
                             _            ->
-                                stop state1 "evaluate: no aliases"
+                                stop state1 "evaluate: no aliases" -}
                     _                  -> stop state1 "evaluate: SizeOf of non-reference"
 
             , fRef = \ ref ty pos state1 -> 

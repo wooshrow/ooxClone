@@ -2,11 +2,13 @@ module Execution.Semantics.StackFrame where
 
 import qualified Data.Stack as T
 import qualified Data.Map as M
+import qualified Data.Set as S
 import           Text.Pretty
 import           Control.Lens ((&), (^.), (%~))
 import           Execution.Effects
 import           Execution.State
 import           Execution.State.Thread
+import           Execution.State.AliasMap as AliasMap
 import           Language.Syntax
 
 writeDeclaration :: ExecutionState -> Identifier -> Expression -> Engine r ExecutionState
@@ -30,9 +32,20 @@ readDeclaration :: ExecutionState -> Identifier -> Engine r Expression
 readDeclaration state var
     | Just thread <- getCurrentThread state =
         case getLastStackFrame thread of
-            Just frame -> do
-                let value = (frame ^. declarations) M.!? var
-                maybe (stop state (readDeclarationErrorMessage var)) return value
+            Just frame ->
+                case (frame ^. declarations) M.!? var of
+                    Nothing ->
+                        stop state ("readDeclaration: failed to read variable '" ++ toString var ++ "')")
+                    Just value@(SymbolicRef ref _ _) ->
+                        case AliasMap.lookup ref (state ^. aliasMap) of
+                            Nothing -> 
+                                return value
+                            Just aliases ->
+                                if S.size aliases == 1
+                                    then return $ S.elemAt 0 aliases
+                                    else return value
+                    Just value ->
+                        return value
             Nothing    ->
                 stop state "readDeclaration: no stack frame"
     | otherwise = 
@@ -40,8 +53,3 @@ readDeclaration state var
 
 getLastStackFrame :: Thread -> Maybe StackFrame
 getLastStackFrame thread = T.peek (thread ^. callStack)
-
-readDeclarationErrorMessage :: Identifier -> String
-readDeclarationErrorMessage (Identifier var pos) =
-    "readDeclaration: failed to read variable '" ++ var ++ "' declared at " ++
-    "'" ++ toString pos

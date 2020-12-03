@@ -6,6 +6,7 @@ module Execution.Semantics.Concretization(
     , concretesOfType
     , initializeSymbolicRef
     , createSymbolicVar
+    , removeSymbolicNull
 ) where
 
 import qualified Data.Map as M
@@ -182,3 +183,16 @@ initializeSymbolicField state field = do
     let symName = Identifier (oldName ++ show symNameIndex) pos 
     let value   = createSymbolicVar symName (typeOf field)
     return (fieldName, value)
+
+--------------------------------------------------------------------------------
+-- Auxiliary functions
+--------------------------------------------------------------------------------
+
+-- TODO: rewrite to lookup -> deleteAt to have O(log n) instead of O(n)
+removeSymbolicNull :: ExecutionState -> Expression -> Engine r ExecutionState
+removeSymbolicNull state (SymbolicRef ref _ _)
+    | Just aliases <- AliasMap.lookup ref (state ^. aliasMap) = do
+        let filtered = S.filter (/= lit' nullLit') aliases
+        return $ state & (aliasMap %~ AliasMap.insert ref filtered)
+    | otherwise =
+        return state

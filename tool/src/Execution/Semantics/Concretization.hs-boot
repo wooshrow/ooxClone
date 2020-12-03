@@ -4,3 +4,5 @@ module Execution.Semantics.Concretization where
     import Language.Syntax (Expression)
 
     initializeSymbolicRef :: ExecutionState -> Expression -> Engine r ExecutionState
+    
+    removeSymbolicNull :: ExecutionState -> Expression -> Engine r ExecutionState

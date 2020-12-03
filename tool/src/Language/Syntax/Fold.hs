@@ -5,6 +5,7 @@ module Language.Syntax.Fold(
     , monoidExpressionAlgebra
     , monoidMExpressionAlgebra
     , identityExpressionAlgebra
+    , identityMExpressionAlgebra
     , foldExpression
 ) where
 
@@ -111,6 +112,20 @@ identityExpressionAlgebra = ExpressionAlgebra
     , fRef    = Ref
     , fSymRef = SymbolicRef
     , fCond   = Conditional }
+
+identityMExpressionAlgebra :: Monad m => ExpressionAlgebra (m Expression)
+identityMExpressionAlgebra = ExpressionAlgebra
+    { fForall = \ a b c d e f -> Forall a b c <$> d <*> pure e <*> pure f
+    , fExists = \ a b c d e f -> Exists a b c <$> d <*> pure e <*> pure f
+    , fBinOp  = \ a b c d e   -> BinOp a <$> b <*> c <*> pure d <*> pure e
+    , fUnOp   = \ a b c d     -> UnOp a <$> b <*> pure c <*> pure d
+    , fVar    = \ a b c       -> pure $ Var a b c
+    , fSymVar = \ a b c       -> pure $ SymbolicVar a b c
+    , fLit    = \ a b c       -> pure $ Lit a b c
+    , fSizeOf = \ a b c       -> pure $ SizeOf a b c
+    , fRef    = \ a b c       -> pure $ Ref a b c
+    , fSymRef = \ a b c       -> pure $ SymbolicRef a b c
+    , fCond   = \ a b c d e   -> Conditional <$> a <*> b <*> c <*> pure d <*> pure e }
 
 foldExpression :: ExpressionAlgebra r -> Expression -> r
 foldExpression ExpressionAlgebra{..} = fold

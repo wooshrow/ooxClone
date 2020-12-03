@@ -3,79 +3,62 @@ module Execution.Verification(
     , verify
 ) where
 
-import qualified Data.Map                   as M
-import qualified Data.Set                   as S
+import qualified Data.Map as M
+import qualified Data.Set as S
 import           Data.Maybe
 import           Control.Monad (void)
 import           Polysemy
-import           Polysemy.Error
-import           Polysemy.State
-import           Polysemy.Reader
 import           Z3.Monad
 import           Control.Lens
-import           Logger
 import           Text.Pretty
 import           Data.Positioned
 import           Data.Statistics
-import           Data.Configuration
 import           Execution.Result
 import           Analysis.CFA.CFG
+import           Execution.Effects
+import           Execution.State
 import           Execution.State.AliasMap as AliasMap
 import           Language.Syntax
 import           Language.Syntax.Fold
-import qualified Language.Syntax.Lenses    as SL
+import           Execution.Semantics.Concretization
+import qualified Language.Syntax.Lenses as SL
 import           Language.Syntax.Pretty()
-
-type Concretization = M.Map Identifier Expression
 
 --------------------------------------------------------------------------------
 -- Verification Interface
 --------------------------------------------------------------------------------
 
-verifyM  :: (HasConfiguration a, Members [State Statistics, Reader a, Embed IO, Trace, Error VerificationResult] r)
-    => [CFGContext] -> AliasMap -> Position -> Maybe Expression -> Sem r ()
-verifyM programTrace aliases pos = maybe (return ()) (verify programTrace aliases pos)
+verifyM :: ExecutionState -> Maybe Expression -> Engine r ExecutionState
+verifyM state = maybe (return state) (verify state)
 
-verify :: (HasConfiguration a, Members [State Statistics, Reader a, Embed IO, Trace, Error VerificationResult] r)
-    => [CFGContext] -> AliasMap -> Position -> Expression -> Sem r ()
-verify programTrace aliases pos = void . verifyEach programTrace pos . concretize aliases
+verify :: ExecutionState -> Expression -> Engine r ExecutionState
+verify state0 expression0 = nonDetToError undefined $ do
+    (state1, concretizations) <- concretesOfType state0 REFRuntimeType expression0
+    concretize concretizations state1 $ \ state2 -> do
+        expression1 <- substitute state2 expression0
+        measureInvokeZ3
+        (result, _) <- (embed . evalZ3 . verifyZ3) expression1
+        case result of
+            Unsat -> return state2
+            Sat   -> invalid state2 expression1
+            Undef -> unknown state2 expression1
 
-verifyEach :: (HasConfiguration a, Members [State Statistics, Reader a, Embed IO, Trace, Error VerificationResult] r)
-    => [CFGContext] -> Position -> [Expression] -> Sem r Result
-verifyEach _            _   []     = return Unsat
-verifyEach programTrace pos (n:ns) = do
-    debug ("Verifying: " ++ toString n)
-    measureInvokeZ3
-    (result, _) <- (embed . evalZ3 . verifyZ3) n
-    case result of
-        Unsat -> verifyEach programTrace pos ns
-        Sat   -> throw $ Invalid pos programTrace
-        Undef -> throw $ Unknown pos programTrace
+substitute :: ExecutionState -> Expression -> Engine r Expression
+substitute state = foldExpression algebra
+    where
+        algebra = identityMExpressionAlgebra { fSymRef = substituteSymbolicRef state }
+
+substituteSymbolicRef :: ExecutionState -> Identifier -> RuntimeType -> Position -> Engine r Expression
+substituteSymbolicRef state ref _ _
+    | Just aliases <- AliasMap.lookup ref (state ^. aliasMap)
+    , S.size aliases == 1 =
+        return $ S.elemAt 0 aliases
+    | otherwise =
+        stop state ("substitute: no aliases for '" ++ toString ref ++ "'")
 
 --------------------------------------------------------------------------------
 -- Verification Engine
 --------------------------------------------------------------------------------
-
-concretize :: AliasMap -> Expression -> [Expression]
-concretize aliases formula
-    | refs <- findSymbolicRefs formula
-    , not (null refs) 
-        = let mappings = map (\ ref -> map (ref ^?! SL.var, ) (maybe (error "concretize") S.toList (AliasMap.lookup (ref ^?! SL.var) aliases))) (S.toList refs)
-           in map (\ p -> makeConcrete (M.fromList p) formula) (sequence mappings)
-    | otherwise
-        = [formula]
-
-makeConcrete :: Concretization -> Expression -> Expression
-makeConcrete substitutions = foldExpression algebra
-    where
-        algebra = identityExpressionAlgebra
-            { fSymRef = \ ref _ _ -> fromMaybe (error ("makeConcrete: " ++ toString ref)) (substitutions M.!? ref) }
-        
-findSymbolicRefs :: Expression -> S.Set Expression
-findSymbolicRefs = foldExpression algebra
-    where
-        algebra = monoidExpressionAlgebra
-            { fSymRef = \ symVar varTy varPos -> S.singleton (SymbolicRef symVar varTy varPos) }
 
 verifyZ3 :: Expression -> Z3 (Result, Maybe Model)
 verifyZ3 formula = (assert =<< construct formula) >> solverCheckAndGetModel

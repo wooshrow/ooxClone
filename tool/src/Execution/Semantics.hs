@@ -21,7 +21,7 @@ import qualified Data.Set as S
 import qualified Data.Map as M
 import           Data.Maybe
 import           Control.Monad (foldM)
-import           Control.Lens ((&), (^?!), (^.), (%~), (<>~))
+import           Control.Lens ((&), (^?!), (^.), (%~), (.~), (<>~))
 import           Control.Monad.Extra
 import           Text.Pretty
 import           Data.Configuration
@@ -54,7 +54,7 @@ execAssert state0 assertion = do
     measureVerification
     let assumptions = state0 ^. constraints
     config              <- askConfig
-    let currentProgramTrace = state0 ^. programTrace
+    --let currentProgramTrace = state0 ^. programTrace
     (state1, concretizations) <- concretesOfType state0 ARRAYRuntimeType assertion
     concretize concretizations state1 $ \ state2 -> do
         let formula0 = asExpression (PathConstraints.insert (neg' assertion) assumptions)
@@ -66,10 +66,10 @@ execAssert state0 assertion = do
             Right False ->
                 return state3
             Left formula2 -> do
-                let verification = verify currentProgramTrace (state3 ^. aliasMap) (getPos assertion) formula2
-                if cacheFormulas config 
-                    then underCache formula2 verification
-                    else verification
+                _ <- verify state3 (formula2 & SL.info .~ getPos assertion)
+                --if cacheFormulas config 
+                --    then underCache formula2 verification
+                --    else verification
                 return state3
 
 execAssertEnsures :: ExecutionState -> Engine r ExecutionState
