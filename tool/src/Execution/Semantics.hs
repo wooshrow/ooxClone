@@ -67,9 +67,6 @@ execAssert state0 assertion = do
                 return state3
             Left formula2 -> do
                 _ <- verify state3 (formula2 & SL.info .~ getPos assertion)
-                --if cacheFormulas config 
-                --    then underCache formula2 verification
-                --    else verification
                 return state3
 
 execAssertEnsures :: ExecutionState -> Engine r ExecutionState

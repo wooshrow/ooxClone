@@ -11,6 +11,7 @@ data Statistics = Statistics
     , _numberOfCompletePaths        :: Int
     , _numberOfVerifications        :: Int
     , _numberOfLocalSolves          :: Int
+    , _numberOfCacheHits            :: Int
     , _numberOfZ3Invocations        :: Int
     , _totalRuntime                 :: NominalDiffTime
     , _maximumNumberOfThreads       :: Int }
@@ -24,6 +25,7 @@ initialStatistics = Statistics
     , _numberOfCompletePaths        = 0
     , _numberOfVerifications        = 0
     , _numberOfLocalSolves          = 0
+    , _numberOfCacheHits            = 0
     , _numberOfZ3Invocations        = 0
     , _totalRuntime                 = 0
     , _maximumNumberOfThreads       = 0 }
@@ -46,6 +48,9 @@ measureVerification = modify (\ stats -> stats & (numberOfVerifications +~ 1))
 
 measureLocalSolve :: Member (State Statistics) r => Sem r ()
 measureLocalSolve = modify (\ stats -> stats & (numberOfLocalSolves +~ 1))
+
+measureCacheHit :: Member (State Statistics) r => Sem r ()
+measureCacheHit = modify (\ stats -> stats & (numberOfCacheHits +~ 1))
 
 measureMaximumForks :: Member (State Statistics) r => Int -> Sem r ()
 measureMaximumForks forks = modify (\ stats -> stats & maximumNumberOfThreads .~ max (_maximumNumberOfThreads stats) forks)

@@ -12,6 +12,7 @@ import           Z3.Monad
 import           Control.Lens
 import           Text.Pretty
 import           Data.Positioned
+import           Data.Configuration
 import           Data.Statistics
 import           Execution.Result
 import           Analysis.CFA.CFG
@@ -32,7 +33,18 @@ verifyM :: ExecutionState -> Maybe Expression -> Engine r ExecutionState
 verifyM state = maybe (return state) (verify state)
 
 verify :: ExecutionState -> Expression -> Engine r ExecutionState
-verify state0 expression0 = nonDetToError undefined $ do
+verify state expression = do
+    config <- askConfig
+    if cacheFormulas config
+        then do 
+            isCached <- cached expression
+            if isCached 
+                then measureCacheHit >> return state
+                else store expression >> verify' state expression
+        else verify' state expression
+
+verify' :: ExecutionState -> Expression -> Engine r ExecutionState
+verify' state0 expression0 = nonDetToError undefined $ do
     (state1, concretizations) <- concretesOfType state0 REFRuntimeType expression0
     concretize concretizations state1 $ \ state2 -> do
         expression1 <- substitute state2 expression0
@@ -41,7 +53,7 @@ verify state0 expression0 = nonDetToError undefined $ do
         case result of
             Unsat -> return state2
             Sat   -> invalid state2 expression1
-            Undef -> unknown state2 expression1
+            Undef -> unknown state2 expression1 
 
 substitute :: ExecutionState -> Expression -> Engine r Expression
 substitute state = foldExpression algebra

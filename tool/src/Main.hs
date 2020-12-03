@@ -37,6 +37,7 @@ executeOnce config = do
     putStrLn $ "\t Total #complete paths:\t" ++ show (_numberOfCompletePaths statistics)
     putStrLn $ "\t Total #verifications:\t" ++ show (_numberOfVerifications statistics)
     putStrLn $ "\t Total #locally solved:\t" ++ show (_numberOfLocalSolves statistics)
+    putStrLn $ "\t Total #cache hits:\t" ++ show (_numberOfCacheHits statistics)
     putStrLn $ "\t Total #Z3 invocations:\t" ++ show (_numberOfZ3Invocations statistics)
     putStrLn $ "\t Maximum #forks:\t" ++ show (_maximumNumberOfThreads statistics)
     return (either (const (error "error result")) id result, statistics{_totalRuntime = runtime})
