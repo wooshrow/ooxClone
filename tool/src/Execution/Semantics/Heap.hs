@@ -17,7 +17,7 @@ import           Control.Monad
 import qualified Data.Map as M
 import qualified Data.Set as S
 import           Text.Pretty
-import           Control.Lens ((&), (^?!), (^.), (%~), (.~), element, Field2(_2))
+import           Control.Lens ((&), (^?!), (^.), (%~), (.~), element, Field2(_2), _head, _tail)
 import           Data.Positioned
 import           Analysis.Type.Typeable
 import           Execution.Effects
@@ -132,7 +132,12 @@ readConcreteElem state ref index = do
         else infeasible
 
 readSymbolicElem :: ExecutionState -> Reference -> Expression -> Engine r Expression
-readSymbolicElem = undefined
+readSymbolicElem state ref index = do
+    structure <- dereference state ref
+    let (ArrayValue values) = structure
+    let indices = map (lit' . intLit') [1..]
+    let value = foldr (\ (value, concIndex) -> conditional' (index `equal'` concIndex) value) (values ^?! _head) (zip (values ^?! _tail) indices)
+    return value
 
 writeConcreteElem :: ExecutionState -> Reference -> Int -> Expression -> Engine r ExecutionState
 writeConcreteElem state ref index value = do
