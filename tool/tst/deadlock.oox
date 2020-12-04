@@ -28,5 +28,8 @@ class Main
 
 class Ref
 {
-    Ref() { ; }
+    Ref()
+    {
+        ;
+    }
 }

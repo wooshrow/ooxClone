@@ -1,0 +1,27 @@
+class Node {
+    int value ;
+    Node next ;
+
+    static int min(Node node)
+        requires(node != null)
+        exceptional(false)
+    {
+        int N := 3;
+        int [] values := new int [N];
+        int i := 0;
+
+        int min := node.value ;
+        Node next := node.next ;
+        while ( next != null && i < N) {
+            int value := next.value;
+            if ( value < min) {
+                min := value ;
+            }
+            next := next.next;
+            values [i] := value;
+            i := i + 1;
+        }
+        assert forall value , index : values : min <= value;
+        return min;
+    }
+}
