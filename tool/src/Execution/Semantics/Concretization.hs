@@ -1,7 +1,8 @@
 module Execution.Semantics.Concretization(
       Concretization
-    , concretize
     , concretizeWithResult
+    , concretize
+    , concretizeMap
     , concretesOfTypeM
     , concretesOfType
     , initializeSymbolicRef
@@ -45,6 +46,10 @@ concretizeWithResult cs state f = foldr (\ x a -> f (concretize' state x) <|> a)
 concretize :: [Concretization] -> ExecutionState -> (ExecutionState -> Engine r ExecutionState) -> Engine r ExecutionState
 concretize [] state f = f state
 concretize cs state f = foldr (\ x a -> f (concretize' state x) <|> a) empty cs
+
+concretizeMap :: [Concretization] -> ExecutionState -> (ExecutionState -> Engine r ExecutionState) -> Engine r [ExecutionState]
+concretizeMap [] state f = (:[]) <$> f state
+concretizeMap cs state f = mapM (f . concretize' state) cs
 
 concretize' :: ExecutionState -> Concretization -> ExecutionState
 concretize' state = foldr (\ (symRef, concRef) stateN -> stateN & (aliasMap %~ AliasMap.insert symRef (S.singleton concRef))) state . M.toList

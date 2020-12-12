@@ -44,16 +44,17 @@ verify state expression = do
         else verify' state expression
 
 verify' :: ExecutionState -> Expression -> Engine r ExecutionState
-verify' state0 expression0 = nonDetToError undefined $ do
+verify' state0 expression0 = do
     (state1, concretizations) <- concretesOfType state0 REFRuntimeType expression0
-    concretize concretizations state1 $ \ state2 -> do
+    concretizeMap concretizations state1 $ \ state2 -> do
         expression1 <- substitute state2 expression0
         measureInvokeZ3
         (result, _) <- (embed . evalZ3 . verifyZ3) expression1
         case result of
             Unsat -> return state2
             Sat   -> invalid state2 expression1
-            Undef -> unknown state2 expression1 
+            Undef -> unknown state2 expression1
+    return state0
 
 substitute :: ExecutionState -> Expression -> Engine r Expression
 substitute state = foldExpression algebra

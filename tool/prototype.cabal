@@ -39,6 +39,7 @@ executable app
                           , Execution.Semantics.Thread
                           , Execution.Semantics.Evaluation
                           , Execution.Semantics.PartialOrderReduction
+                          , Execution.Semantics.Assignment
                           , Execution.State
                           , Execution.State.PathConstraints
                           , Execution.State.LockSet

@@ -25,7 +25,7 @@ import Polysemy.State
 import Polysemy.NonDet
 import Polysemy.Reader
 import Control.Applicative
-import Control.Lens
+import Control.Lens ((^.), Field1(_1), Field2(_2), Field3(_3))
 import Logger
 import Execution.State
 import Data.Configuration
