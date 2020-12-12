@@ -203,18 +203,22 @@ evaluateQuantifier :: ([Expression] -> Expression) -> Identifier -> Identifier -
 evaluateQuantifier quantifier element range domain formula _ _ state0 = do
     ref <- readDeclaration state0 domain
     case ref of
-        Lit NullLit{} _ _ -> infeasible
-        SymbolicRef{}     -> stop state0 "evaluateQuantifier: symbolic reference"
-        Ref ref _ _       -> do
-            structure <- dereference state0 ref
-            let (ArrayValue values) = structure
-            let options = (zip values . map (lit' . intLit')) [0..]
-            formulas <- forM options $ \ (value, index) -> do
-                state1 <- writeDeclaration state0 element value
-                state2 <- writeDeclaration state1 range index
-                formula state2
-            -- TODO: the alias map needs to be extracted from formulas and passed on
-            evaluate state0 (quantifier (map snd formulas))
+        Lit NullLit{} _ _ -> 
+            infeasible
+        SymbolicRef{}     -> 
+            stop state0 "evaluateQuantifier: symbolic reference"
+        Ref ref _ _       ->
+            case dereference state0 ref of
+                Just (ArrayValue values) -> do
+                    let options = (zip values . map (lit' . intLit')) [0..]
+                    formulas <- forM options $ \ (value, index) -> do
+                        state1 <- writeDeclaration state0 element value
+                        state2 <- writeDeclaration state1 range index
+                        formula state2
+                    -- TODO: the alias map needs to be extracted from formulas and passed on
+                    evaluate state0 (quantifier (map snd formulas))
+                Nothing ->
+                    stop state0 ("evaluateQuantifier: dereference of uninitialized ref '" ++ toString ref ++ "'")
 
 evaluateBinOp :: ExecutionState -> BinOp -> Expression -> Expression ->  RuntimeType -> Position -> Engine r Expression
 -- Boolean Evaluation
