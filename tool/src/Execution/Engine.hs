@@ -3,6 +3,7 @@ module Execution.Engine(
 ) where
 
 import qualified Data.Set as S
+import           Data.Maybe (fromJust)
 import           System.Random.Shuffle
 import           Control.Monad hiding (guard)
 import           Control.Applicative
@@ -106,11 +107,6 @@ execT state0 (_, _, CallNode entry constructor@Constructor{} Nothing arguments l
 execT state0 (_, _, CallNode{}, ns) =
     stop state0 ("execT: there should be exactly 1 neighbour, there are '" ++ show (length ns) ++ "'")
 
--- A Fork
-execT state0 (_, _, ForkNode _ method arguments, neighbours) = do
-    (state1, _) <- execFork state0 method arguments
-    branch (step state1) neighbours
-
 -- A Member Entry
 execT state0 (_, _, MemberEntry{}, neighbours) = do
     state1 <- execMemberEntry state0
@@ -178,6 +174,14 @@ execT state0 (_, _, StatNode (Lock var _ _), neighbours) = do
 -- An Unlock Statement
 execT state0 (_, _, StatNode (Unlock var _ _), neighbours) = do
     state1 <- execUnlock state0 var
+    branch (step state1) neighbours
+
+-- A Fork Statement
+execT state0 (_, _, StatNode (Fork invocation _ _), neighbours) = do
+    let method    = fromJust (invocation ^. SL.resolved) ^. _2
+    -- TODO: the next line does not work for constructors.
+    let arguments = invocation ^. SL.arguments 
+    (state1, _) <- execFork state0 method arguments
     branch (step state1) neighbours
 
 -- Any other Statement

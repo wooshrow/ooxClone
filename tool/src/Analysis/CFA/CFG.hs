@@ -67,10 +67,6 @@ data CFGNodeValue
         (Maybe (NonVoidType, Identifier))
         [Expression]
         (Maybe Lhs)
-    | ForkNode
-        Node
-        DeclarationMember
-        [Expression]
     | MemberEntry 
         RuntimeType 
         Identifier
@@ -120,14 +116,6 @@ instance P.Pretty CFGNodeValue where
 
     pretty (CallNode _ member _ _ _)
         = P.text "call of" P.<+> P.quotes pMethod
-        where
-            pMethod   = pReturnTy P.<+> pName P.<> pParams
-            pReturnTy = P.pretty (typeOf member)
-            pName     = P.pretty (member ^?! SL.name)
-            pParams   = P.parens (P.commas (map (^?! SL.ty) (member ^?! SL.params)))
-
-    pretty (ForkNode _ member _)
-        = P.text "fork of" P.<+> P.quotes pMethod
         where
             pMethod   = pReturnTy P.<+> pName P.<> pParams
             pReturnTy = P.pretty (typeOf member)

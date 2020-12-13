@@ -111,8 +111,6 @@ dependentOperationsOfN state tid (_, _, CallNode _ _ Nothing arguments _, _)
     = (,S.empty) . S.unions <$> mapM (dependentOperationsOfE state tid) arguments
 --dependentOperationsOfN thread (_, _, CallNode _ _ (Just this) arguments _, _) 
 --    = (,S.empty) . S.unions <$> mapM (dependentOperationsOfE thread) arguments
-dependentOperationsOfN state tid (_, _, ForkNode _ _ arguments, _) 
-    = (,S.empty) . S.unions <$> mapM (dependentOperationsOfE state tid) arguments
 dependentOperationsOfN _ _ _                        
     = return (S.empty, S.empty)
 
@@ -124,6 +122,7 @@ dependentOperationsOfS state tid (Assume ass _ _)     = (,S.empty) <$> dependent
 dependentOperationsOfS state tid (Return expr _ _)    = (,S.empty) <$> maybe (return S.empty) (dependentOperationsOfE state tid) expr
 dependentOperationsOfS state tid (Lock var _ _)       = (\ refs -> (refs, refs)) <$> getReferences state tid var
 dependentOperationsOfS state tid (Unlock var _ _)     = (\ refs -> (refs, refs)) <$> getReferences state tid var
+dependentOperationsOfS state tid (Fork inv _ _)       = (,S.empty) <$> dependentOperationsOfI state tid inv
 dependentOperationsOfS _     _   _                    = return (S.empty, S.empty)
 
 dependentOperationsOfLhs :: ExecutionState -> ThreadId -> Lhs -> Engine r (S.Set Reference)

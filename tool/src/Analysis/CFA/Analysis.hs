@@ -88,7 +88,6 @@ finalStatement Return{}    = S.empty
 finalStatement Throw{}     = S.empty
 finalStatement s@Block{}   = finalStatement (s ^?! SL.body)
 finalStatement s@Try{}     = S.fromList [toTryExitNode s , toCatchExitNode s]
-finalStatement s@Fork{}    = finalInvocationFork (s ^?! SL.invocation)
 finalStatement s@Seq{}     = case s ^?! SL.stat1 of 
                                 Break{}    -> S.empty
                                 Continue{} -> S.empty
@@ -149,10 +148,8 @@ constructStatement member s
             insertEs (finalStatement _catchBody) catchExitNode
         Block{_body} -> 
             constructStatement member _body
-        Fork{_invocation} -> do
-            insertStatN s 
-            insertForkN _invocation
-            insertE (initStatement s) (initInvocationFork _invocation)                    
+        Fork{_invocation} ->
+            insertStatN s                  
         Seq{_stat1, _stat2} -> 
             case _stat1 of
                 Continue{}  
@@ -212,20 +209,6 @@ toCallNode lhs invocation
             | otherwise                           
                 = Nothing
 
-initInvocationFork :: Invocation -> CFGNode
-initInvocationFork = toForkNode
-
-finalInvocationFork :: Invocation -> CFGNodes
-finalInvocationFork invocation = S.singleton (toForkNode invocation) 
-
-toForkNode :: Invocation -> CFGNode
-toForkNode invocation 
-    = (invocation ^. SL.label, ForkNode memberEntry member arguments)
-    where
-        arguments   = invocation ^. SL.arguments
-        member      = invocation ^. SL.resolved ^?! _Just ^. _2
-        memberEntry = member ^?! SL.labels ^. _1
-
 insertEs :: Member (State ControlFlowGraph) r 
     => CFGNodes -> CFGNode -> Sem r ()
 insertEs froms to = mapM_ (`insertE` to) froms
@@ -241,10 +224,6 @@ insertStatN stat = modify (insNode (toNode stat))
 insertCallN :: Member (State ControlFlowGraph) r 
     => Maybe Lhs -> Invocation -> Sem r ()
 insertCallN lhs invocation = modify (insNode (toCallNode lhs invocation))
-
-insertForkN :: Member (State ControlFlowGraph) r 
-    => Invocation -> Sem r ()
-insertForkN invocation = modify (insNode (toForkNode invocation))
 
 insertNs :: Member (State ControlFlowGraph) r 
     => CFGNodes -> Sem r ()
