@@ -30,7 +30,7 @@ import Logger
 import Execution.State
 import Data.Configuration
 import Data.Positioned
-import Text.Pretty (toString)
+import Text.Pretty (toDebugString)
 import Data.Statistics
 import Analysis.CFA.CFG
 import Analysis.SymbolTable
@@ -52,7 +52,7 @@ infeasible = measurePrune >> empty
 -- | Terminate with an internal error.
 stop :: ExecutionState -> String -> Engine r a
 stop state message = do
-    debug ("Stopping with state: \n" ++ toString state)
+    debug ("Stopping with state: \n" ++ toDebugString state)
     throw $ InternalError message
 
 -- | Terminate with an invalid expression.

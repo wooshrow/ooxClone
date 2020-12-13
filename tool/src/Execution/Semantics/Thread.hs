@@ -19,23 +19,23 @@ import           Language.Syntax
 --------------------------------------------------------------------------------
 
 pushStackFrameOnCurrentThread :: ExecutionState -> Node -> DeclarationMember -> Maybe Lhs -> [(Parameter, Expression)] -> Engine r ExecutionState
-pushStackFrameOnCurrentThread state0 returnPoint member lhs params
-    | Just tid <- state0 ^. currentThreadId = 
-        pushStackFrame state0 tid returnPoint member lhs params
+pushStackFrameOnCurrentThread state returnPoint member lhs params
+    | Just tid <- state ^. currentThreadId = 
+        pushStackFrame state tid returnPoint member lhs params
     | otherwise =
-        stop state0 "pushStackFrameOnCurrentThread: cannot get current thread"
+        stop state "pushStackFrameOnCurrentThread: cannot get current thread"
 
 pushStackFrame :: ExecutionState -> ThreadId -> Node -> DeclarationMember -> Maybe Lhs -> [(Parameter, Expression)] -> Engine r ExecutionState
 pushStackFrame state0 tid returnPoint member lhs params = do
     let frame0 = StackFrame returnPoint lhs M.empty member
-    state1 <- incrementLastHandlerPops state0
+    state1 <- incrementLastHandlerPops state0 tid
     case getThread state1 tid of
         Just thread0 -> do
             (state2, frame1) <- foldM (writeParam thread0) (state1, frame0) params
             let thread1 = thread0 & (callStack %~ T.push frame1)
             return $ updateThreadInState state2 thread1
         Nothing      ->
-            stop state1 "pushStackFrame: cannot get current thread"
+            stop state1 ("pushStackFrame: cannot get thread with thread id'" ++ toDebugString tid ++ "'")
 
 writeParam :: Thread -> (ExecutionState, StackFrame) -> (Parameter, Expression) -> Engine r (ExecutionState, StackFrame)
 writeParam thread (stateN, frameN) (Parameter _ name _, value0)
@@ -43,11 +43,6 @@ writeParam thread (stateN, frameN) (Parameter _ name _, value0)
     | T.null (thread ^. callStack) && processTid == (thread ^. parent) = do
         debug ("Writing parameter '" ++ toString name ++ "'")
         return (stateN, writeDeclarationOnFrame frameN name value0)
-    -- A fork call
-    | T.null (thread ^. callStack) && processTid /= (thread ^. parent) = do
-        debug ("Writing and evaluating parameter '" ++ toString name ++ "'")
-        (stateN', value1) <- evaluate (stateN & (currentThreadId ?~ (thread ^. parent))) value0
-        return (stateN' & (currentThreadId ?~ (thread ^. tid)), writeDeclarationOnFrame frameN name value1)
     -- A regular call
     | otherwise = do
         debug ("Writing and evaluating parameter '" ++ toString name ++ "'")

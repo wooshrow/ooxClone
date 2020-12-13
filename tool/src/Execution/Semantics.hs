@@ -151,10 +151,10 @@ execNewObject state0 constructor arguments lhs neighbour  = do
     -- Push a new stack frame.
     pushStackFrameOnCurrentThread state1 neighbour constructor lhs (zip parameters arguments')
 
-execFork :: ExecutionState -> Node -> DeclarationMember -> [Expression] -> Engine r (ExecutionState, ThreadId)
-execFork state entry member arguments
+execFork :: ExecutionState -> DeclarationMember -> [Expression] -> Engine r (ExecutionState, ThreadId)
+execFork state member arguments
     | Just parent <- state ^. currentThreadId =
-        spawn state parent entry member arguments
+        spawn state parent member arguments
     | otherwise = 
         stop state "execFork: cannot get current thread"
 
@@ -169,7 +169,6 @@ execMemberExit :: ExecutionState -> RuntimeType -> Engine r (ExecutionState, May
 execMemberExit state0 returnTy = do
     -- Verify the post-condition
     state1 <- execAssertEnsures state0
-    --concatForM states $ \ state1 ->   
     if isLastStackFrame state1
         -- Despawn if this is the last stack frame to be popped
         then do

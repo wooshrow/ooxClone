@@ -35,7 +35,7 @@ readDeclaration state var
             Just frame ->
                 case (frame ^. declarations) M.!? var of
                     Nothing ->
-                        stop state ("readDeclaration: failed to read variable '" ++ toString var ++ "')")
+                        stop state ("readDeclaration: failed to read variable " ++ toDebugString var)
                     Just value@(SymbolicRef ref _ _) ->
                         case AliasMap.lookup ref (state ^. aliasMap) of
                             Nothing -> 

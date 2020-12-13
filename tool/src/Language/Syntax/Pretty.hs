@@ -239,4 +239,7 @@ instance Pretty RuntimeType where
 --------------------------------------------------------------------------------
 
 instance Pretty Identifier where
-    pretty Identifier{..} = text _name
+    pretty Identifier{..} 
+        = text _name
+    prettyDebug Identifier{..}
+        = quotes (text _name) <+> text "declared at" <+> quotes (pretty _info)

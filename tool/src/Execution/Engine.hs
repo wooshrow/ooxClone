@@ -48,11 +48,9 @@ test config cfg table method = runError (runNonDet (evalCache (runReader (config
 
 start :: ExecutionState -> DeclarationMember -> Engine r ExecutionState
 start state0 initialMethod = do
-    (config, cfg, _) <- ask
+    config <- askConfig
     let state1 = state0 & remainingK .~ maximumDepth config & currentThreadId ?~ processTid
-    let entry  = context cfg (initialMethod ^?! SL.labels ^. _1) ^. _2
-    (state2, tid) <- execFork state1 entry initialMethod arguments
-    debug ("Spawning initial thread with thread id '" ++ toString tid ++ "'")
+    (state2, tid) <- execFork state1 initialMethod arguments
     let state3 = state2 & (currentThreadId ?~ tid)
     -- Add the pre-condition as assumption, branch if it contains an array.
     case initialMethod ^?! SL.specification ^. SL.requires of
@@ -109,8 +107,8 @@ execT state0 (_, _, CallNode{}, ns) =
     stop state0 ("execT: there should be exactly 1 neighbour, there are '" ++ show (length ns) ++ "'")
 
 -- A Fork
-execT state0 (_, _, ForkNode entry method arguments, neighbours) = do
-    (state1, _) <- execFork state0 entry method arguments
+execT state0 (_, _, ForkNode _ method arguments, neighbours) = do
+    (state1, _) <- execFork state0 method arguments
     branch (step state1) neighbours
 
 -- A Member Entry
@@ -177,7 +175,7 @@ execT state0 (_, _, StatNode (Lock var _ _), neighbours) = do
     state1 <- execLock state0 var
     branch (step state1) neighbours
 
--- An unlock Statement
+-- An Unlock Statement
 execT state0 (_, _, StatNode (Unlock var _ _), neighbours) = do
     state1 <- execUnlock state0 var
     branch (step state1) neighbours

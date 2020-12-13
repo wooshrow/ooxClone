@@ -16,9 +16,13 @@ import qualified Data.HashSet as H
 import           Data.List (intersperse)
 
 class Pretty a where
-    pretty   :: a -> Doc
+    pretty      :: a -> Doc
+    prettyDebug :: a -> Doc
+    prettyDebug = pretty
     toString :: a -> String
     toString = render . pretty
+    toDebugString :: a -> String
+    toDebugString = render . prettyDebug
     prettyPrint :: a -> IO ()
     prettyPrint = putStrLn . toString
 

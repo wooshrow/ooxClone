@@ -29,9 +29,16 @@ removeLastHandler state
     | otherwise = 
         stop state "removeLastHandler: cannot get current thread"
 
-incrementLastHandlerPops :: ExecutionState -> Engine r ExecutionState
-incrementLastHandlerPops state
-    | Just thread1         <- getCurrentThread state
+incrementLastHandlerPopsOnCurrentThread :: ExecutionState -> Engine r ExecutionState
+incrementLastHandlerPopsOnCurrentThread state
+    | Just tid <- state ^. currentThreadId = 
+        incrementLastHandlerPops state tid
+    | otherwise = 
+        stop state "pushStackFrameOnCurrentThread: cannot get current thread"
+
+incrementLastHandlerPops :: ExecutionState -> ThreadId -> Engine r ExecutionState
+incrementLastHandlerPops state tid
+    | Just thread1         <- getThread state tid
     , Just (handler, pops) <- T.peek (thread1 ^. handlerStack) = do
         debug ("Incrementing exception handler stack pop to '" ++ show (pops + 1) ++ "'")
         let thread2 = thread1 & (handlerStack %~ T.updateTop (handler, pops + 1))
