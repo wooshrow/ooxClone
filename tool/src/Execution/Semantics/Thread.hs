@@ -3,7 +3,7 @@ module Execution.Semantics.Thread where
 import qualified Data.Stack as T
 import qualified Data.Map as M
 import           Control.Monad (foldM)
-import           Control.Lens ((&), (^.), (%~), (?~))
+import           Control.Lens ((&), (^.), (%~))
 import           Text.Pretty
 import           Analysis.CFA.CFG
 import           Execution.Semantics.StackFrame

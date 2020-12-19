@@ -28,7 +28,6 @@ import {-# SOURCE #-} Execution.Semantics.Concretization (initializeSymbolicRef,
 import           Language.Syntax
 import           Language.Syntax.DSL
 import qualified Language.Syntax.Lenses as SL
-import           Language.Syntax.Fold
 
 allocate :: ExecutionState -> HeapValue -> Engine r (ExecutionState, Expression)
 allocate state0 structure = do
@@ -177,10 +176,3 @@ writeSymbolicElem state ref index value =
             stop state ("writeSymbolicElem: dereference of uninitialized ref '" ++ toString ref ++ "'")
     where
         indices = map (lit' . intLit') [0..]
-
---------------------------------------------------------------------------------
--- Auxiliary functions
---------------------------------------------------------------------------------
-
-segfault :: ExecutionState -> Reference -> Engine r HeapValue
-segfault state ref = stop state ("segfault on reference '" ++ show ref ++ "'")

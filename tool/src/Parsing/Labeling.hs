@@ -57,12 +57,8 @@ labelizeStat = foldStatement labelingAlg
 labelingAlg :: Member (State Label) r => StatementAlgebra (Sem r Statement)
 labelingAlg = 
     ( \ ty name _ s -> Declare ty name <$> nextLabel <*> pure s
-    , \ lhs rhs _ s -> do
-        l <- nextLabel
-        Assign lhs <$> labelingRhs rhs <*> pure l <*> pure s
-    , \ inv _ s -> do
-        l <- nextLabel
-        Call <$> labelizeInv inv <*> pure l <*> pure s
+    , \ lhs rhs _ s -> Assign lhs rhs <$> nextLabel <*> pure s
+    , \ inv _ s -> Call inv <$> nextLabel <*> pure s
     , \ _ s -> Skip <$> nextLabel <*> pure s
     , \ e _ s -> Assert e <$> nextLabel <*> pure s
     , \ e _ s -> Assume e <$> nextLabel <*> pure s
@@ -83,9 +79,7 @@ labelingAlg =
     , \ body _ s -> (\ l b -> Block b l s) <$> nextLabel <*> body
     , \ var _ s -> Lock var <$> nextLabel <*> pure s
     , \ var _ s -> Unlock var <$> nextLabel <*> pure s
-    , \ inv _ s -> do
-        l <- nextLabel
-        Fork <$> labelizeInv inv <*> pure l <*> pure s
+    , \ inv _ s -> Fork inv <$> nextLabel <*> pure s
     , \ _ s -> Join <$> nextLabel <*> pure s
     , \ s1 s2 _ s -> do
         l'  <- nextLabel
@@ -94,14 +88,4 @@ labelingAlg =
         case s1' of
             Seq a b l x -> pure $ Seq a (Seq b s2' l' s) l x
             _           -> pure $ Seq s1' s2' l' s)
-            
-labelingRhs :: Rhs -> LabelingEffects r Rhs
-labelingRhs rhs@RhsCall{} = do
-    inv' <- labelizeInv (rhs ^?! SL.invocation)
-    return $ rhs & (SL.invocation .~ inv')
-labelingRhs rhs = return rhs
 
-labelizeInv :: Invocation -> LabelingEffects r Invocation
-labelizeInv inv = do 
-    label <- nextLabel
-    return $ inv & (SL.label .~ label)

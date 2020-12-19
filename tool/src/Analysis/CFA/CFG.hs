@@ -14,12 +14,9 @@ module Analysis.CFA.CFG(
 
 import           Data.Graph.Inductive.Graph
 import           Data.Graph.Inductive.PatriciaTree
-import           Control.Lens                      hiding ((&))
 import qualified Data.Set                          as S
 import qualified Text.Pretty                       as P
-import           Analysis.Type.Typeable
 import           Language.Syntax
-import qualified Language.Syntax.Lenses            as SL
 import           Language.Syntax.Pretty()
 
 type ControlFlowGraph = ControlFlowGraph' CFGNodeValue ()
@@ -61,12 +58,6 @@ type CFGNode = LNode CFGNodeValue
 data CFGNodeValue
     = StatNode 
         Statement
-    | CallNode 
-        Node
-        DeclarationMember
-        (Maybe (NonVoidType, Identifier))
-        [Expression]
-        (Maybe Lhs)
     | MemberEntry 
         RuntimeType 
         Identifier
@@ -113,14 +104,6 @@ instance P.Pretty (a, Node) where
 instance P.Pretty CFGNodeValue where
     pretty (StatNode stat) 
         = P.pretty stat
-
-    pretty (CallNode _ member _ _ _)
-        = P.text "call of" P.<+> P.quotes pMethod
-        where
-            pMethod   = pReturnTy P.<+> pName P.<> pParams
-            pReturnTy = P.pretty (typeOf member)
-            pName     = P.pretty (member ^?! SL.name)
-            pParams   = P.parens (P.commas (map (^?! SL.ty) (member ^?! SL.params)))
 
     pretty (MemberEntry retType className methodName params) 
         = P.text "entry of" P.<+> P.quotes pMethod

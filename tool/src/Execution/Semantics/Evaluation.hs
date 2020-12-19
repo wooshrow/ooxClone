@@ -7,27 +7,24 @@ module Execution.Semantics.Evaluation(
     , evaluate
 ) where
 
-import qualified Data.Set as S
-import           Control.Lens ((^.)) 
-import           Control.Monad
-import           Text.Pretty
-import           Data.Configuration
-import           Data.Statistics
-import           Analysis.CFA.CFG
-import           Analysis.SymbolTable
-import           Logger
-import           Execution.Semantics.StackFrame
-import           Execution.Semantics.Heap
-import           Execution.Semantics.Concretization
-import           Execution.Effects
-import           Execution.State
-import           Execution.State.Heap
-import           Execution.State.AliasMap as AliasMap
-import           Execution.Result
-import           Data.Positioned
-import           Language.Syntax
-import           Language.Syntax.Fold
-import           Language.Syntax.DSL
+import Control.Monad
+import Text.Pretty
+import Data.Configuration
+import Data.Statistics
+import Analysis.CFA.CFG
+import Analysis.SymbolTable
+import Logger
+import Execution.Semantics.StackFrame
+import Execution.Semantics.Heap
+import Execution.Semantics.Concretization
+import Execution.Effects
+import Execution.State
+import Execution.State.Heap
+import Execution.Result
+import Data.Positioned
+import Language.Syntax
+import Language.Syntax.Fold
+import Language.Syntax.DSL
 
 -- | An Evaluation Result is either a (simplified) expression or the result type.
 type EvaluationResult a = Either Expression a
@@ -164,22 +161,8 @@ evaluate' state0 expression = foldExpression algebra expression state0
                         return (state1, size)
                     SymbolicRef ref _ _ ->
                         stop state1 "evaluate: SizeOf of symbolic reference"
-                        {-case AliasMap.lookup ref (state1 ^. aliasMap) of
-                            Just aliases -> if S.size aliases == 1
-                                then 
-                                    case S.elemAt 0 aliases of
-                                        Lit NullLit{} _ _-> 
-                                            infeasible
-                                        Ref ref _ _      -> do
-                                            size <- fmap (lit' . intLit') (sizeof state1 ref)
-                                            return (state1, size)
-                                        _                ->
-                                            stop state1 "evaluate: no aliases"
-                                else 
-                                    stop state1 "evaluate: SizeOf of symbolic reference"
-                            _            ->
-                                stop state1 "evaluate: no aliases" -}
-                    _                  -> stop state1 "evaluate: SizeOf of non-reference"
+                    _ -> 
+                        stop state1 "evaluate: SizeOf of non-reference"
 
             , fRef = \ ref ty pos state1 -> 
                 return (state1, Ref ref ty pos)

@@ -3,10 +3,7 @@ module Execution.Verification(
     , verify
 ) where
 
-import qualified Data.Map as M
 import qualified Data.Set as S
-import           Data.Maybe
-import           Control.Monad (void)
 import           Polysemy
 import           Z3.Monad
 import           Control.Lens
@@ -14,8 +11,6 @@ import           Text.Pretty
 import           Data.Positioned
 import           Data.Configuration
 import           Data.Statistics
-import           Execution.Result
-import           Analysis.CFA.CFG
 import           Execution.Effects
 import           Execution.State
 import           Execution.State.AliasMap as AliasMap
@@ -46,7 +41,7 @@ verify state expression = do
 verify' :: ExecutionState -> Expression -> Engine r ExecutionState
 verify' state0 expression0 = do
     (state1, concretizations) <- concretesOfType state0 REFRuntimeType expression0
-    concretizeMap concretizations state1 $ \ state2 -> do
+    _ <- concretizeMap concretizations state1 $ \ state2 -> do
         expression1 <- substitute state2 expression0
         measureInvokeZ3
         (result, _) <- (embed . evalZ3 . verifyZ3) expression1

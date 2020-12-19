@@ -108,13 +108,10 @@ instance WithPos Statement where
     getPos = _info
 
 data Invocation
-    = InvokeMethod { _lhs :: Identifier, _rhs :: Identifier, _arguments :: [Expression], _resolved :: Maybe (Declaration, DeclarationMember), _label :: Label, _info :: Position }
-    | InvokeConstructor { _className :: Identifier, _arguments :: [Expression], _resolved :: Maybe (Declaration, DeclarationMember), _label :: Label, _info :: Position }
+    = InvokeMethod { _lhs :: Identifier, _rhs :: Identifier, _arguments :: [Expression], _resolved :: Maybe (Declaration, DeclarationMember), _info :: Position }
+    | InvokeConstructor { _className :: Identifier, _arguments :: [Expression], _resolved :: Maybe (Declaration, DeclarationMember), _info :: Position }
     deriving (Show)
  
-instance Eq Invocation where
-    a == b = (_label :: Invocation -> Label) a == (_label :: Invocation -> Label) b
-
 instance WithPos Invocation where
     getPos = _info
 
@@ -130,7 +127,7 @@ data Rhs
     | RhsElem { _var :: Expression, _index :: Expression, _ty :: RuntimeType, _info :: Position }
     | RhsCall { _invocation :: Invocation, _ty :: RuntimeType, _info :: Position }
     | RhsArray { _arrayTy :: NonVoidType, _sizes :: [Expression], _ty :: RuntimeType, _info :: Position }
-    deriving (Eq, Show)
+    deriving (Show)
 
 instance WithPos Rhs where
     getPos = _info

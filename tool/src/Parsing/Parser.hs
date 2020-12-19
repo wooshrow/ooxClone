@@ -170,7 +170,7 @@ pRhs = do
     where
         pRhsCall       = RhsCall       <$> pInvocation
         pRhsField      = RhsField      <$> pVar <*  pDot <*> pIdentifier
-        pRhsNewObject  = (\ pos name args -> RhsCall (InvokeConstructor name args Nothing unknownLabel pos)) <$> getPosition <* pToken TNew <*> pIdentifier  <*> pBetweenParens (pExpression `sepBy` pComma)
+        pRhsNewObject  = (\ pos name args -> RhsCall (InvokeConstructor name args Nothing pos)) <$> getPosition <* pToken TNew <*> pIdentifier  <*> pBetweenParens (pExpression `sepBy` pComma)
         pRhsArray      = RhsArray      <$  pToken TNew <*> pNonArrayType <*> many1 (pBetweenSquare pExpression)
         pRhsElem       = RhsElem       <$> pVar <*> pBetweenSquare pExpression
         pRhsExpression = RhsExpression <$> pExpression
@@ -294,7 +294,7 @@ pInvocation = do
     pDot
     method <- pIdentifier
     arguments <- pBetweenParens (pExpression `sepBy` pComma)
-    return $ InvokeMethod lhs method arguments Nothing unknownLabel pos
+    return $ InvokeMethod lhs method arguments Nothing pos
 
 --------------------------------------------------------------------------------
 -- Expression parsing

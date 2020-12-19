@@ -258,7 +258,7 @@ typeRhs _ (RhsArray ty sizes _ pos) = do
     return $ RhsArray ty sizes' arrayTy pos
 
 typeInvocation :: RuntimeType -> Invocation -> TypingEffects r Invocation
-typeInvocation targetTy (InvokeMethod lhs methodName arguments _ label pos) = do
+typeInvocation targetTy (InvokeMethod lhs methodName arguments _ pos) = do
     table <- ask
     arguments' <- mapM typeExpression arguments
     env <- get
@@ -267,7 +267,7 @@ typeInvocation targetTy (InvokeMethod lhs methodName arguments _ label pos) = do
     let className    = maybe lhs (\ ty -> Identifier (toString ty) (getPos lhs)) isVariableTy
     let methods      = S.toList <$> matchMethod className methodName targetTy argTypes table
     case methods of
-        Just [symbol] -> return $ InvokeMethod lhs methodName arguments' (Just (getDeclaration symbol, getMember symbol)) label pos
+        Just [symbol] -> return $ InvokeMethod lhs methodName arguments' (Just (getDeclaration symbol, getMember symbol)) pos
         Just _        -> throw (duplicateResolvedMethodError className methodName targetTy argTypes)
         Nothing       -> throw (unresolvedMethodError className methodName targetTy argTypes)
 typeInvocation targetTy inv@InvokeConstructor{} = do

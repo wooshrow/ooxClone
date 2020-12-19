@@ -107,8 +107,8 @@ dependentOperationsOfT state thread = dependentOperationsOfN state (thread ^. ti
 dependentOperationsOfN :: ExecutionState -> ThreadId -> CFGContext -> Engine r ReadWriteSet
 dependentOperationsOfN state tid (_, _, StatNode stat, _) 
     = dependentOperationsOfS state tid stat
-dependentOperationsOfN state tid (_, _, CallNode _ _ Nothing arguments _, _) 
-    = (,S.empty) . S.unions <$> mapM (dependentOperationsOfE state tid) arguments
+--dependentOperationsOfN state tid (_, _, CallNode _ _ Nothing arguments _, _) 
+--    = (,S.empty) . S.unions <$> mapM (dependentOperationsOfE state tid) arguments
 --dependentOperationsOfN thread (_, _, CallNode _ _ (Just this) arguments _, _) 
 --    = (,S.empty) . S.unions <$> mapM (dependentOperationsOfE thread) arguments
 dependentOperationsOfN _ _ _                        

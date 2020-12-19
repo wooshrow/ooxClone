@@ -2,8 +2,7 @@ module Execution.Semantics(
       execAssert
     , execAssume
     , execReturn
-    , execCall
-    , execNewObject
+    , execInvocation
     , execFork
     , execMemberEntry
     , execMemberExit
@@ -20,9 +19,7 @@ module Execution.Semantics(
 import qualified Data.Set as S
 import qualified Data.Map as M
 import           Data.Maybe
-import           Control.Monad (foldM)
 import           Control.Lens ((&), (^?!), (^.), (%~), (.~), (<>~))
-import           Control.Monad.Extra
 import           Text.Pretty
 import           Data.Configuration
 import           Data.Statistics
@@ -47,15 +44,12 @@ import           Execution.State.Thread
 import           Execution.State.Heap
 import           Execution.State.PathConstraints as PathConstraints
 import           Execution.State.LockSet as LockSet
-import           Execution.State.AliasMap as AliasMap
 import           Execution.Verification
 
 execAssert :: ExecutionState -> Expression -> Engine r ExecutionState
 execAssert state0 assertion = do
     measureVerification
     let assumptions = state0 ^. constraints
-    config              <- askConfig
-    --let currentProgramTrace = state0 ^. programTrace
     (state1, concretizations) <- concretesOfType state0 ARRAYRuntimeType assertion
     concretize concretizations state1 $ \ state2 -> do
         let formula0 = asExpression (PathConstraints.insert (neg' assertion) assumptions)
@@ -130,16 +124,42 @@ execAssume state0 assumption0 = do
                 debug ("Adding constraint: '" ++ toString assumption2 ++ "'")
                 return $ state3 & (constraints <>~ PathConstraints.singleton assumption2)
 
-execCall :: ExecutionState -> DeclarationMember -> [Expression] -> Maybe Lhs -> Node -> Maybe (NonVoidType, Identifier) -> Engine r ExecutionState
-execCall state method arguments lhs neighbour thisInfo = do
-    -- Construct the parameters and arguments.
-    let parameters = [Parameter (fst (fromJust thisInfo)) this' unknownPos | isJust thisInfo] ++ method ^?! SL.params
-    let arguments' = [var' (snd (fromJust thisInfo)) (typeOf (fst (fromJust thisInfo))) | isJust thisInfo] ++ arguments
-    -- Push a new stack frame.
-    pushStackFrameOnCurrentThread state neighbour method lhs (zip parameters arguments')
+execInvocation :: ExecutionState -> Invocation -> Maybe Lhs -> Node -> Engine r (ExecutionState, Node)
+execInvocation state0 invocation lhs neighbour
+    | Just (declaration, member) <- invocation ^. SL.resolved = do
+        let arguments = invocation ^. SL.arguments
+        case member of
+            Method True _ _ _ _ _ labels _-> do
+                state1 <- execStaticMethod state0 member arguments lhs neighbour
+                return (state1, fst labels)
+            Method False _ _ _ _ _ labels _ -> do
+                let thisTy = ReferenceType (declaration ^. SL.name) unknownPos
+                let this   = (thisTy, invocation ^?! SL.lhs)
+                state1 <- execMethod state0 member arguments lhs neighbour this
+                return (state1, fst labels)
+            Constructor _ _ _ _ labels _ -> do
+                state1 <- execConstructor state0 member arguments lhs neighbour
+                return (state1, fst labels)
+            Field{} -> 
+                stop state0 "execInvocation: invocation resolved to a field"
+    | otherwise = 
+        stop state0 "execInvocation: unresolved invocation target"
 
-execNewObject :: ExecutionState -> DeclarationMember -> [Expression] -> Maybe Lhs -> Node -> Engine r ExecutionState
-execNewObject state0 constructor arguments lhs neighbour  = do
+execStaticMethod :: ExecutionState -> DeclarationMember -> [Expression] -> Maybe Lhs -> Node -> Engine r ExecutionState
+execStaticMethod state method arguments lhs neighbour = do
+    let parameters = method ^?! SL.params
+    pushStackFrameOnCurrentThread state neighbour method lhs (zip parameters arguments)
+
+execMethod :: ExecutionState -> DeclarationMember -> [Expression] -> Maybe Lhs -> Node -> (NonVoidType, Identifier) -> Engine r ExecutionState
+execMethod state method arguments lhs neighbour this = do
+    -- Construct the parameters and arguments, with 'this' as an implicit parameter.
+    let parameters' = parameter' (fst this) this' : method ^?! SL.params
+    let arguments'  = var' (snd this) (typeOf (fst this)) : arguments
+    -- Push a new stack frame.
+    pushStackFrameOnCurrentThread state neighbour method lhs (zip parameters' arguments')
+
+execConstructor :: ExecutionState -> DeclarationMember -> [Expression] -> Maybe Lhs -> Node -> Engine r ExecutionState
+execConstructor state0 constructor arguments lhs neighbour  = do
     -- Construct the parameters, with 'this' as an implicit parameter.
     let className  = constructor ^?! SL.name
     let parameters = parameter' (refType' className) this' : constructor ^?! SL.params

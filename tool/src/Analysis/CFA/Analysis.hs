@@ -11,7 +11,6 @@ import           Control.Lens.Extras
 import           Data.Graph.Inductive.Graph      (insEdge, insNode)
 import           Data.Error
 import           Language.Syntax
-import           Language.Syntax.DSL
 import qualified Language.Syntax.Lenses     as SL
 import           Analysis.Type.Typeable
 import           Analysis.CFA.CFG
@@ -77,10 +76,6 @@ initStatement s@Try{}   = toTryEntryNode s
 initStatement s         = toNode s
 
 finalStatement :: Statement -> CFGNodes
-finalStatement s@Assign{} = if SL._RhsCall `is` (s ^?! SL.rhs)
-                                then finalInvocationCall (Just (s ^?! SL.lhs)) (s ^?! SL.rhs ^?! SL.invocation)
-                                else S.singleton (toNode s)
-finalStatement s@Call{}    = finalInvocationCall Nothing (s ^?! SL.invocation)
 finalStatement s@Ite{}     = finalStatement (s ^?! SL.trueBody) `S.union` finalStatement (s ^?! SL.falseBody)
 finalStatement Continue{}  = S.empty
 finalStatement Break{}     = S.empty
@@ -111,16 +106,9 @@ constructStatement :: Members [Error ErrorMessage, State ControlFlowGraph] r
 constructStatement member s
     = case s of
         Assign{_lhs,_rhs} -> 
-            case _rhs of
-                RhsCall{_invocation} 
-                    -> insertStatN s
-                    <* insertCallN (Just _lhs) _invocation
-                    <* insertE (initStatement s) (initInvocationCall (Just _lhs) _invocation)
-                _ -> insertStatN s
-        Call{_invocation} -> do
+            insertStatN s
+        Call{_invocation} ->
             insertStatN s 
-            insertCallN Nothing _invocation
-            insertE (initStatement s) (initInvocationCall Nothing _invocation)
         Ite{_trueBody, _falseBody} -> do
             insertStatN s 
             constructStatement member _trueBody 
@@ -177,12 +165,6 @@ constructStatement member s
 toNode :: Statement -> CFGNode
 toNode s = (s ^. SL.label, StatNode s)
 
-initInvocationCall :: Maybe Lhs -> Invocation -> CFGNode
-initInvocationCall = toCallNode
-
-finalInvocationCall :: Maybe Lhs -> Invocation -> CFGNodes
-finalInvocationCall lhs invocation = S.singleton (toCallNode lhs invocation) 
-
 toTryEntryNode :: Statement -> CFGNode
 toTryEntryNode s = (s ^?! SL.label, TryEntry (s ^?! SL.label3))
 
@@ -195,20 +177,6 @@ toCatchEntryNode s = (s ^?! SL.label3, CatchEntry)
 toCatchExitNode :: Statement -> CFGNode
 toCatchExitNode s = (s ^?! SL.label4, CatchExit)
 
-toCallNode :: Maybe Lhs -> Invocation -> CFGNode
-toCallNode lhs invocation 
-    = (invocation ^. SL.label, CallNode memberEntry member thisParam arguments lhs)
-    where
-        arguments   = invocation ^. SL.arguments
-        className   = invocation ^. SL.resolved ^?! _Just ^. _1 ^. SL.name
-        member      = invocation ^. SL.resolved ^?! _Just ^. _2
-        memberEntry = member ^?! SL.labels ^. _1
-        thisParam    
-            | Just False <- member ^? SL.isStatic 
-                = Just (refType' className, invocation ^?! SL.lhs)
-            | otherwise                           
-                = Nothing
-
 insertEs :: Member (State ControlFlowGraph) r 
     => CFGNodes -> CFGNode -> Sem r ()
 insertEs froms to = mapM_ (`insertE` to) froms
@@ -220,10 +188,6 @@ insertE (from, _) (to, _) = modify (insEdge (from, to, ()))
 insertStatN :: Member (State ControlFlowGraph) r 
     => Statement -> Sem r ()
 insertStatN stat = modify (insNode (toNode stat))
-
-insertCallN :: Member (State ControlFlowGraph) r 
-    => Maybe Lhs -> Invocation -> Sem r ()
-insertCallN lhs invocation = modify (insNode (toCallNode lhs invocation))
 
 insertNs :: Member (State ControlFlowGraph) r 
     => CFGNodes -> Sem r ()

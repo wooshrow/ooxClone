@@ -6,13 +6,9 @@ module Execution.Semantics.Assignment(
 import qualified Data.Set as S
 import           Control.Monad
 import           Control.Monad.Extra
-import           Control.Lens
+import           Control.Lens ((^?!), (^.))
 import           Text.Pretty
-import           Analysis.CFA.CFG
-import           Analysis.SymbolTable
 import           Analysis.Type.Typeable
-import           Data.Statistics
-import           Data.Configuration
 import           Execution.State
 import           Execution.State.Heap
 import           Execution.State.AliasMap as AliasMap
@@ -21,9 +17,7 @@ import           Execution.Semantics.Evaluation
 import           Execution.Semantics.Heap
 import           Execution.Semantics.StackFrame
 import           Execution.Semantics.Concretization
-import           Execution.Result
 import           Language.Syntax
-import           Language.Syntax.Fold
 import qualified Language.Syntax.Lenses as SL
 
 execLhs :: ExecutionState -> Lhs -> Expression -> Engine r ExecutionState
@@ -112,7 +106,8 @@ execRhs state0 rhs@RhsElem{} = do
     let var = rhs ^?! SL.var ^?! SL.var
     ref <- readDeclaration state0 var
     case ref of
-        Lit NullLit{} _ _   -> infeasible
+        Lit NullLit{} _ _   -> 
+            infeasible
         SymbolicRef ref _ _ -> 
             case AliasMap.lookup ref (state0 ^. aliasMap) of
                 Nothing      -> 

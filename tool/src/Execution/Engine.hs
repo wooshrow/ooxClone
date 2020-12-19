@@ -7,14 +7,13 @@ import           Data.Maybe (fromJust)
 import           System.Random.Shuffle
 import           Control.Monad hiding (guard)
 import           Control.Applicative
-import           Control.Lens ((&), (^?!), (^.), (%~), (-~), (.~), (?~), Field1(_1), Field2(_2))
+import           Control.Lens ((&), (^?!), (^.), (%~), (-~), (.~), (?~), Field2(_2))
 import           Data.Configuration
 import           Data.Error
 import           Data.Statistics
 import           Logger
 import           Language.Syntax
 import qualified Language.Syntax.Lenses as SL
-import           Text.Pretty (Pretty(toString))
 import           Analysis.CFA.CFG
 import           Analysis.SymbolTable
 import           Execution.Semantics
@@ -93,18 +92,11 @@ execT state (_, _, ExceptionalNode, _) = do
     state1 <- execException state
     uncurry stepM state1
 
--- A Method Call
-execT state0 (_, _, CallNode entry method@Method{} thisInfo arguments lhs, [(_, neighbour)]) = do
-    state1 <- execCall state0 method arguments lhs neighbour thisInfo
+execT state0 (_, _, StatNode (Call invocation _ _), [(_, neighbour)]) = do
+    (state1, entry) <- execInvocation state0 invocation Nothing neighbour
     step state1 ((), entry)
 
--- A Constructor Call
-execT state0 (_, _, CallNode entry constructor@Constructor{} Nothing arguments lhs, [(_, neighbour)]) = do
-    state1 <- execNewObject state0 constructor arguments lhs neighbour
-    step state1 ((), entry)
-
--- A Method or Constructor Call with not exactly one neighbour 
-execT state0 (_, _, CallNode{}, ns) =
+execT state0 (_, _, StatNode Call{}, ns) =
     stop state0 ("execT: there should be exactly 1 neighbour, there are '" ++ show (length ns) ++ "'")
 
 -- A Member Entry
@@ -147,16 +139,22 @@ execT state0 (_, _, StatNode (Declare ty var _ _), neighbours) = do
     state1 <- execDeclare state0 ty var
     branch (step state1) neighbours
 
+-- | An Assign Statement with a Call rhs
+execT state0 (_, _, StatNode (Assign lhs (RhsCall invocation _ _) _ _), [(_, neighbour)]) = do
+    (state1, entry) <- execInvocation state0 invocation (Just lhs) neighbour
+    step state1 ((), entry)
+
+-- | An Assign Statement
 execT state0 (_, _, StatNode (Assign lhs rhs _ _), neighbours) = do
     state1 <- execAssign state0 lhs rhs
     branch (step state1) neighbours
 
--- An Assert statement
+-- An Assert Statement
 execT state0 (_, _, StatNode (Assert assertion _ _), neighbours) = do
     state1 <- execAssert state0 assertion
     branch (step state1) neighbours
 
--- An Assume statement
+-- An Assume Statement
 execT state0 (_, _, StatNode (Assume assumption _ _), neighbours) = do
     state1 <- execAssume state0 assumption
     branch (step state1) neighbours
