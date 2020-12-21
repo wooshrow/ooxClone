@@ -176,10 +176,11 @@ pRhs = do
         pRhsExpression = RhsExpression <$> pExpression
 
 pCall :: P Statement
-pCall =  do
+pCall = do
     pos <- getPosition
     invocation <- pInvocation
-    return $ Call invocation unknownLabel pos
+    let statement = Call invocation unknownLabel pos
+    return $ createExceptionalItes (exceptionalInvocation invocation) statement pos
 
 pSkip :: P Statement
 pSkip = do
