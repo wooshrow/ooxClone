@@ -24,7 +24,7 @@ spawn state0 parent member arguments = do
     let thread     = Thread tid parent pc T.empty T.empty
     let state1     = updateThreadInState state0 thread
     let parameters = member ^?! SL.params
-    state2 <- pushStackFrame state1 tid undefined member Nothing (zip parameters arguments)
+    state2 <- pushStackFrame state1 tid (-1) member Nothing (zip parameters arguments)
     debug ("Spawning thread with thread id '" ++ toDebugString tid ++ "'")
     return (state2 & (numberOfForks +~ 1), tid)
 

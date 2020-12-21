@@ -3,6 +3,7 @@ module Execution.Semantics.Concretization(
     , concretizeWithResult
     , concretize
     , concretizeMap
+    , concretesOfTypes
     , concretesOfTypeM
     , concretesOfType
     , initializeSymbolicRef
@@ -12,6 +13,7 @@ module Execution.Semantics.Concretization(
 
 import qualified Data.Map as M
 import qualified Data.Set as S
+import           Data.Foldable (fold)
 import           Data.Maybe
 import           Data.Configuration
 import           Data.Positioned
@@ -54,20 +56,26 @@ concretizeMap cs state f = mapM (f . concretize' state) cs
 concretize' :: ExecutionState -> Concretization -> ExecutionState
 concretize' state = foldr (\ (symRef, concRef) stateN -> stateN & (aliasMap %~ AliasMap.insert symRef (S.singleton concRef))) state . M.toList
 
+concretesOfTypes :: ExecutionState -> RuntimeType -> [Expression] -> Engine r (ExecutionState, [Concretization])
+concretesOfTypes state0 ty formulas
+    | Just _ <- getCurrentThread state0 = do
+        refs   <- fold <$> mapM (findSymbolicRefsOfType state0 ty) formulas
+        state1 <- foldM initializeSymbolicRef state0 refs
+        let mappings = map (\ ref -> map (ref ^?! SL.var, ) (S.toList (fromMaybe (error "concretesOfType") (AliasMap.lookup (ref ^?! SL.var) (state1 ^. aliasMap))))) (S.toList refs)
+        return (state1, map M.fromList (sequence mappings))
+    | otherwise =
+        stop state0 "concretesOfTypes: cannot get current thread"
+
 concretesOfTypeM :: ExecutionState -> RuntimeType -> Maybe Expression -> Engine r (ExecutionState, [Concretization])
 concretesOfTypeM state ty = maybe (return (state, [])) (concretesOfType state ty)
 
 concretesOfType :: ExecutionState -> RuntimeType -> Expression -> Engine r (ExecutionState, [Concretization])
 concretesOfType state0 ty formula
     | Just _ <- getCurrentThread state0 = do
-        refs <- findSymbolicRefsOfType state0 ty formula
-        if null refs
-            then 
-                return (state0, [])
-            else do
-                state1 <- foldM initializeSymbolicRef state0 refs
-                let mappings = map (\ ref -> map (ref ^?! SL.var, ) (S.toList (fromMaybe (error "concretesOfType") (AliasMap.lookup (ref ^?! SL.var) (state1 ^. aliasMap))))) (S.toList refs)
-                return (state1, map M.fromList (sequence mappings))
+        refs   <- findSymbolicRefsOfType state0 ty formula
+        state1 <- foldM initializeSymbolicRef state0 refs
+        let mappings = map (\ ref -> map (ref ^?! SL.var, ) (S.toList (fromMaybe (error "concretesOfType") (AliasMap.lookup (ref ^?! SL.var) (state1 ^. aliasMap))))) (S.toList refs)
+        return (state1, map M.fromList (sequence mappings))
     | otherwise =
         stop state0 "concretesOfType: cannot get current thread"
 
@@ -104,9 +112,10 @@ findSymbolicRefsOfType state ty = foldExpression algebra
                         then S.singleton ref
                         else S.empty
                         
-            , fSymRef = \ symVar varTy varPos -> return $ if varTy `isOfType` ty 
-                            then S.singleton (SymbolicRef symVar varTy varPos) 
-                            else S.empty }
+            , fSymRef = \ symVar varTy varPos ->
+                return $ if varTy `isOfType` ty 
+                        then S.singleton (SymbolicRef symVar varTy varPos) 
+                        else S.empty }
 
 --------------------------------------------------------------------------------
 -- Lazy Symbolic Reference Initialization

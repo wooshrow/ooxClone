@@ -128,20 +128,22 @@ execInvocation :: ExecutionState -> Invocation -> Maybe Lhs -> Node -> Engine r 
 execInvocation state0 invocation lhs neighbour
     | Just (declaration, member) <- invocation ^. SL.resolved = do
         let arguments = invocation ^. SL.arguments
-        case member of
-            Method True _ _ _ _ _ labels _-> do
-                state1 <- execStaticMethod state0 member arguments lhs neighbour
-                return (state1, fst labels)
-            Method False _ _ _ _ _ labels _ -> do
-                let thisTy = ReferenceType (declaration ^. SL.name) unknownPos
-                let this   = (thisTy, invocation ^?! SL.lhs)
-                state1 <- execMethod state0 member arguments lhs neighbour this
-                return (state1, fst labels)
-            Constructor _ _ _ _ labels _ -> do
-                state1 <- execConstructor state0 member arguments lhs neighbour
-                return (state1, fst labels)
-            Field{} -> 
-                stop state0 "execInvocation: invocation resolved to a field"
+        (state1, concretizations) <- concretesOfTypes state0 ARRAYRuntimeType arguments
+        concretizeWithResult concretizations state1 $ \ state2 ->
+            case member of
+                Method True _ _ _ _ _ labels _-> do
+                    state3 <- execStaticMethod state2 member arguments lhs neighbour
+                    return (state3, fst labels)
+                Method False _ _ _ _ _ labels _ -> do
+                    let thisTy = ReferenceType (declaration ^. SL.name) unknownPos
+                    let this   = (thisTy, invocation ^?! SL.lhs)
+                    state3 <- execMethod state2 member arguments lhs neighbour this
+                    return (state3, fst labels)
+                Constructor _ _ _ _ labels _ -> do
+                    state3 <- execConstructor state2 member arguments lhs neighbour
+                    return (state3, fst labels)
+                Field{} -> 
+                    stop state2 "execInvocation: invocation resolved to a field"
     | otherwise = 
         stop state0 "execInvocation: unresolved invocation target"
 
