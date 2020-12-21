@@ -77,11 +77,11 @@ execP state0 = do
             (state1, threads) <- por state0 enabledThreads
             config            <- askConfig
             if applyRandomInterleaving config
-                then 
-                    branch (\ thread -> execT (state1 & (currentThreadId ?~ (thread ^. tid))) (thread ^. pc)) threads
-                else do
+                then do
                     shuffledThreads <- embed (shuffleM threads)
                     branch (\ thread -> execT (state1 & (currentThreadId ?~ (thread ^. tid))) (thread ^. pc)) shuffledThreads
+                else 
+                    branch (\ thread -> execT (state1 & (currentThreadId ?~ (thread ^. tid))) (thread ^. pc)) threads
 
 --------------------------------------------------------------------------------
 -- Thread Execution
