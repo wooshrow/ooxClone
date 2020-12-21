@@ -286,7 +286,8 @@ pFork :: P Statement
 pFork = do
     pos <- getPosition
     invocation <- pToken TFork *> pInvocation <* pSemicolon
-    return $ Fork invocation unknownLabel pos
+    let statement = Fork invocation unknownLabel pos
+    return $ createExceptionalItes (exceptionalInvocation invocation) statement pos
 
 pInvocation :: P Invocation
 pInvocation = do
