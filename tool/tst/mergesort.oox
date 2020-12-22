@@ -1,6 +1,6 @@
 class Main {
     static int[] sort(int[] array)
-        requires(array != null)
+        requires(!(array == null))
         ensures(forall v, i : retval : forall w, j : retval : i < j ==> v <= w)
         exceptional(false)
     {

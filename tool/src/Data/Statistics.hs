@@ -37,8 +37,11 @@ measureBranches xs
         let newBranches = length xs - 1
         modify (\ stats -> stats & (numberOfBranches +~ newBranches))
 
+measurePrunes :: Member (State Statistics) r => Int -> Sem r ()
+measurePrunes n = modify (\ stats -> stats & (numberOfPrunes +~ n))
+
 measurePrune :: Member (State Statistics) r => Sem r ()
-measurePrune = modify (\ stats -> stats & (numberOfPrunes +~ 1))
+measurePrune = measurePrunes 1
 
 measureFinish :: Member (State Statistics) r => Sem r ()
 measureFinish = modify (\ stats -> stats & (numberOfCompletePaths +~ 1))

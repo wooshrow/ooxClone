@@ -15,6 +15,7 @@ import qualified Data.Map as M
 import qualified Data.Set as S
 import           Data.Foldable (fold)
 import           Data.Maybe
+import           Data.Statistics
 import           Data.Configuration
 import           Data.Positioned
 import           Control.Monad
@@ -43,11 +44,15 @@ type Concretization = M.Map Identifier Expression
 
 concretizeWithResult :: [Concretization] -> ExecutionState -> (ExecutionState -> Engine r (ExecutionState, a)) -> Engine r (ExecutionState, a)
 concretizeWithResult [] state f = f state
-concretizeWithResult cs state f = foldr (\ x a -> f (concretize' state x) <|> a) empty cs
+concretizeWithResult cs state f = do
+    measureBranches cs
+    foldr (\ x a -> f (concretize' state x) <|> a) empty cs
 
 concretize :: [Concretization] -> ExecutionState -> (ExecutionState -> Engine r ExecutionState) -> Engine r ExecutionState
 concretize [] state f = f state
-concretize cs state f = foldr (\ x a -> f (concretize' state x) <|> a) empty cs
+concretize cs state f = do
+    measureBranches cs
+    foldr (\ x a -> f (concretize' state x) <|> a) empty cs
 
 concretizeMap :: [Concretization] -> ExecutionState -> (ExecutionState -> Engine r ExecutionState) -> Engine r [ExecutionState]
 concretizeMap [] state f = (:[]) <$> f state

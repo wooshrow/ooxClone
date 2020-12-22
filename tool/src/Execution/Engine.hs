@@ -73,15 +73,16 @@ execP state0 = do
     if null allThreads 
         then finish
         else do
+            measureBranches allThreads
             enabledThreads    <- filterM (isEnabled state0) (S.toList allThreads)
             (state1, threads) <- por state0 enabledThreads
             config            <- askConfig
             if applyRandomInterleaving config
                 then do
                     shuffledThreads <- embed (shuffleM threads)
-                    branch (\ thread -> execT (state1 & (currentThreadId ?~ (thread ^. tid))) (thread ^. pc)) shuffledThreads
+                    branch' (\ thread -> execT (state1 & (currentThreadId ?~ (thread ^. tid))) (thread ^. pc)) shuffledThreads
                 else 
-                    branch (\ thread -> execT (state1 & (currentThreadId ?~ (thread ^. tid))) (thread ^. pc)) threads
+                    branch' (\ thread -> execT (state1 & (currentThreadId ?~ (thread ^. tid))) (thread ^. pc)) threads
 
 --------------------------------------------------------------------------------
 -- Thread Execution
@@ -219,3 +220,6 @@ branch :: (Foldable f, Alternative f) => (a -> Engine r b) -> f a -> Engine r b
 branch f options = do
     measureBranches options
     foldr (\ x a -> f x <|> a) empty options
+
+branch' :: (Foldable f, Alternative f) => (a -> Engine r b) -> f a -> Engine r b
+branch' f options = foldr (\ x a -> f x <|> a) empty options

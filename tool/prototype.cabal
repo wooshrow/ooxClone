@@ -97,3 +97,4 @@ executable app
                           , TypeOperators
     ghc-options:            -Wall
                             -fplugin=Polysemy.Plugin
+                            -O3

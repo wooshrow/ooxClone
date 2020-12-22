@@ -52,7 +52,7 @@ execAssert state0 assertion = do
     let assumptions = state0 ^. constraints
     (state1, concretizations) <- concretesOfType state0 ARRAYRuntimeType assertion
     concretize concretizations state1 $ \ state2 -> do
-        let formula0 = asExpression (PathConstraints.insert (neg' assertion) assumptions)
+        let formula0 = neg' (implies' (asExpression assumptions) assertion)
         debug ("Verifying: '" ++ toString formula0 ++ "'")
         (state3, formula1) <- evaluateAsBool state2 formula0
         case formula1 of

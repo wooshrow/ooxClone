@@ -25,6 +25,7 @@ instance Pretty.Pretty PathConstraints where
 singleton :: Expression -> PathConstraints
 singleton = PathConstraints . H.singleton
 
+-- TODO: split insertions as conjuctions?
 insert :: Expression -> PathConstraints -> PathConstraints
 insert c = PathConstraints . H.insert c . unPathConstraints
 

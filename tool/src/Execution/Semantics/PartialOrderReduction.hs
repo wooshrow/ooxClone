@@ -8,6 +8,7 @@ import           Control.Lens ((&), (^?!), (^.), (.~), (?~))
 import           Control.Monad
 import           Text.Pretty
 import           Data.Configuration
+import           Data.Statistics
 import           Execution.Effects
 import           Execution.State
 import           Execution.State.Thread
@@ -52,6 +53,7 @@ por state0 threads = do
             return (state0, threads)
         else do
             uniqueThreads <- filterM (isUniqueInterleaving state0) threads
+            measurePrunes (length threads - length uniqueThreads)
             state1 <- generateConstraints state0 threads
             return (state1, uniqueThreads)
 
