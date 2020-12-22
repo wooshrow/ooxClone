@@ -109,10 +109,6 @@ dependentOperationsOfT state thread = dependentOperationsOfN state (thread ^. ti
 dependentOperationsOfN :: ExecutionState -> ThreadId -> CFGContext -> Engine r ReadWriteSet
 dependentOperationsOfN state tid (_, _, StatNode stat, _) 
     = dependentOperationsOfS state tid stat
---dependentOperationsOfN state tid (_, _, CallNode _ _ Nothing arguments _, _) 
---    = (,S.empty) . S.unions <$> mapM (dependentOperationsOfE state tid) arguments
---dependentOperationsOfN thread (_, _, CallNode _ _ (Just this) arguments _, _) 
---    = (,S.empty) . S.unions <$> mapM (dependentOperationsOfE thread) arguments
 dependentOperationsOfN _ _ _                        
     = return (S.empty, S.empty)
 
@@ -121,10 +117,8 @@ dependentOperationsOfS :: ExecutionState -> ThreadId -> Statement -> Engine r Re
 dependentOperationsOfS state tid (Assign lhs rhs _ _) = (,)        <$> dependentOperationsOfLhs state tid lhs <*> dependentOperationsOfRhs state tid rhs
 dependentOperationsOfS state tid (Assert ass _ _)     = (,S.empty) <$> dependentOperationsOfE state tid ass
 dependentOperationsOfS state tid (Assume ass _ _)     = (,S.empty) <$> dependentOperationsOfE state tid ass
-dependentOperationsOfS state tid (Return expr _ _)    = (,S.empty) <$> maybe (return S.empty) (dependentOperationsOfE state tid) expr
 dependentOperationsOfS state tid (Lock var _ _)       = (\ refs -> (refs, refs)) <$> getReferences state tid var
 dependentOperationsOfS state tid (Unlock var _ _)     = (\ refs -> (refs, refs)) <$> getReferences state tid var
-dependentOperationsOfS state tid (Fork inv _ _)       = (,S.empty) <$> dependentOperationsOfI state tid inv
 dependentOperationsOfS _     _   _                    = return (S.empty, S.empty)
 
 dependentOperationsOfLhs :: ExecutionState -> ThreadId -> Lhs -> Engine r (S.Set Reference)
@@ -133,33 +127,30 @@ dependentOperationsOfLhs state tid (LhsField var _ _ _ _) = getReferences state 
 dependentOperationsOfLhs state tid (LhsElem var _ _ _)    = getReferences state tid var
 
 dependentOperationsOfRhs :: ExecutionState -> ThreadId -> Rhs -> Engine r (S.Set Reference)
-dependentOperationsOfRhs state tid (RhsExpression value _ _) = dependentOperationsOfE state tid value
-dependentOperationsOfRhs state tid (RhsField var _ _ _)      = getReferences state tid (var ^?! SL.var)
-dependentOperationsOfRhs state tid (RhsElem var _ _ _)       = getReferences state tid (var ^?! SL.var)
-dependentOperationsOfRhs state tid (RhsCall inv _ _)         = dependentOperationsOfI state tid inv
-dependentOperationsOfRhs state tid (RhsArray _ sizes _ _)    = S.unions <$> mapM (dependentOperationsOfE state tid) sizes
-
-dependentOperationsOfI :: ExecutionState -> ThreadId -> Invocation -> Engine r (S.Set Reference)
-dependentOperationsOfI state tid inv 
-    = S.unions <$> mapM (dependentOperationsOfE state tid) (inv ^. SL.arguments)
+dependentOperationsOfRhs _     _   RhsExpression{}      = return S.empty
+dependentOperationsOfRhs state tid (RhsField var _ _ _) = getReferences state tid (var ^?! SL.var)
+dependentOperationsOfRhs state tid (RhsElem var _ _ _)  = getReferences state tid (var ^?! SL.var)
+dependentOperationsOfRhs _     _   RhsCall{}            = return S.empty
+dependentOperationsOfRhs _     _   RhsArray{}           = return S.empty
 
 dependentOperationsOfE :: ExecutionState -> ThreadId -> Expression -> Engine r (S.Set Reference)
 dependentOperationsOfE state tid = foldExpression algebra
     where
         algebra = monoidMExpressionAlgebra
-            { fForall = undefined
-            , fExists = undefined
-            , fSizeOf = \ var _ _ -> getReferences state tid var }
+            { fForall = \ _ _ domain _ _ _ -> getReferences state tid domain
+            , fExists = \ _ _ domain _ _ _ -> getReferences state tid domain }
 
 getReferences :: ExecutionState -> ThreadId -> Identifier -> Engine r (S.Set Reference)
 getReferences state tid var = do
     ref <- readDeclaration (state & currentThreadId ?~ tid) var
     case ref of
-        Lit NullLit{} _ _ -> return S.empty
-        Ref{}             -> return $ S.singleton (ref ^?! SL.ref)
+        Lit NullLit{} _ _ -> 
+            return S.empty
+        Ref{} -> 
+            return $ S.singleton (ref ^?! SL.ref)
         SymbolicRef{}     ->
             case AliasMap.lookup (ref ^?! SL.var) (state ^. aliasMap) of
                 Just aliases -> return . S.map (^?! SL.ref) . S.filter (/= lit' nullLit') $ aliases
                 Nothing      -> stop state "getReferences: no aliases"
-        _                 ->
+        _ ->
             stop state "getReferences: non-reference"
