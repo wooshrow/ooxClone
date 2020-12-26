@@ -71,7 +71,7 @@ execP :: ExecutionState -> Engine r ExecutionState
 execP state0 = do
     let allThreads = state0 ^. threads
     if null allThreads 
-        then finish
+        then finish state0
         else do
             measureBranches allThreads
             enabledThreads    <- filterM (isEnabled state0) (S.toList allThreads)
@@ -197,7 +197,7 @@ stepM state0 neighbour
         state1 <- updatePC state0 neighbour
         execP $ state1 & (remainingK -~ 1) & (currentThreadId .~ Nothing)
     | otherwise =
-        finish
+        finish state0
 
 updatePC :: ExecutionState -> Maybe ((), Node) -> Engine r ExecutionState
 updatePC state Nothing = 

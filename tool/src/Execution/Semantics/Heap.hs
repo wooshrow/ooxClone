@@ -55,7 +55,6 @@ writeConcreteField state ref field value =
         Nothing ->
             stop state ("writeConcreteField: dereference of uninitialized ref '" ++ toString ref ++ "'")
 
-
 writeSymbolicField :: ExecutionState -> Expression -> Identifier -> Expression -> Engine r ExecutionState
 writeSymbolicField state0 ref@SymbolicRef{} field value = do
     state1 <- initializeSymbolicRef state0 ref

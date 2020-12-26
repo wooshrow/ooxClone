@@ -6,12 +6,14 @@ module Execution.Verification(
 import qualified Data.Set as S
 import           Polysemy
 import           Z3.Monad
+import           Control.Monad (void)
 import           Control.Lens
 import           Text.Pretty
 import           Data.Positioned
 import           Data.Configuration
 import           Data.Statistics
 import           Execution.Effects
+import           Execution.Semantics.Evaluation
 import           Execution.State
 import           Execution.State.AliasMap as AliasMap
 import           Language.Syntax
@@ -41,6 +43,27 @@ verify state expression = do
 verify' :: ExecutionState -> Expression -> Engine r ExecutionState
 verify' state0 expression0 = do
     (state1, concretizations) <- concretesOfType state0 REFRuntimeType expression0
+    void $ concretizeMap concretizations state1 $ \ state2 -> do
+        expression1 <- substitute state2 expression0
+        (state3, expression2) <- evaluateAsBool state2 expression1
+        case expression2 of
+            Right True ->
+                invalid state3 expression1
+            Right False ->
+                return state3
+            Left expression3 -> do
+                measureInvokeZ3
+                (result, _) <- (embed . evalZ3 . verifyZ3) expression3
+                case result of
+                    Unsat -> return state3
+                    Sat   -> invalid state3 expression3
+                    Undef -> unknown state3 expression3
+    return state0
+
+{-
+verify' :: ExecutionState -> Expression -> Engine r ExecutionState
+verify' state0 expression0 = do
+    (state1, concretizations) <- concretesOfType state0 REFRuntimeType expression0
     _ <- concretizeMap concretizations state1 $ \ state2 -> do
         expression1 <- substitute state2 expression0
         measureInvokeZ3
@@ -50,17 +73,19 @@ verify' state0 expression0 = do
             Sat   -> invalid state2 expression1
             Undef -> unknown state2 expression1
     return state0
-
+-}
 substitute :: ExecutionState -> Expression -> Engine r Expression
 substitute state = foldExpression algebra
     where
-        algebra = identityMExpressionAlgebra { fSymRef = substituteSymbolicRef state }
+        algebra = identityMExpressionAlgebra
+            { fSymRef = substituteSymbolicRef state }
 
 substituteSymbolicRef :: ExecutionState -> Identifier -> RuntimeType -> Position -> Engine r Expression
 substituteSymbolicRef state ref _ _
-    | Just aliases <- AliasMap.lookup ref (state ^. aliasMap)
-    , S.size aliases == 1 =
-        return $ S.elemAt 0 aliases
+    | Just aliases <- AliasMap.lookup ref (state ^. aliasMap) =
+        case S.size aliases of
+            1 -> return $ S.elemAt 0 aliases
+            n -> stop state ("substitute: '" ++ toString n ++ "'' aliases for '" ++ toString ref ++ "'")
     | otherwise =
         stop state ("substitute: no aliases for '" ++ toString ref ++ "'")
 

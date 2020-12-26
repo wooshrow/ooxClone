@@ -63,7 +63,7 @@ execAssert state0 assertion = do
             Left formula2 -> do
                 _ <- verify state3 (formula2 & SL.info .~ getPos assertion)
                 return state3
-
+    
 execAssertEnsures :: ExecutionState -> Engine r ExecutionState
 execAssertEnsures state = do
     config <- askConfig
@@ -245,7 +245,7 @@ execException state0
         state1 <- execAssertExceptional state0
         if isLastStackFrame state1
             then 
-                finish
+                finish state1
             else do
                 state2 <- popStackFrame state1
                 execException state2

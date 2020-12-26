@@ -68,8 +68,12 @@ unknown :: ExecutionState -> Expression -> Engine r a
 unknown state expression = throw $ Unknown (getPos expression) (state ^. programTrace)
 
 -- | Terminate the current branch.
-finish :: Engine r a
-finish = measureFinish >> empty
+finish :: ExecutionState -> Engine r a
+finish state = do
+    let trace = reverse $ map (^. _2) (state ^. programTrace)
+    debug ("Finished program path: " ++ toDebugString trace)
+    measureFinish 
+    empty
 
 -- | Retrieve the current Configuration.
 askConfig :: Engine r Configuration

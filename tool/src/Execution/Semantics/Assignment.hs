@@ -75,31 +75,31 @@ execRhs state0 rhs@RhsField{} = do
     case ref of
         Lit NullLit{} _ _ -> 
             infeasible
-        Ref ref _ _       -> do
+        Ref ref _ _ -> do
             value <- readConcreteField state0 ref field
             return (state0, value)
-        SymbolicRef{}     -> do
+        SymbolicRef{} -> do
             state1 <- initializeSymbolicRef state0 ref
             value  <- readSymbolicField state1 ref field
             return (state1, value)
-        Conditional{}     -> do
-            value <- execRhsFieldConditional ref field
-            return (state0, value)
-        _                 -> 
+        Conditional{} -> 
+            execRhsFieldConditional state0 ref field
+        _ -> 
             stop state0 "execRhs: expected a reference or conditional"
         where
-            execRhsFieldConditional :: Expression -> Identifier -> Engine r Expression
-            execRhsFieldConditional (Conditional guard true0 false0 ty info) field = do
-                true1  <- execRhsFieldConditional true0 field
-                false1 <- execRhsFieldConditional false0 field
-                return $ Conditional guard true1 false1 ty info
-            execRhsFieldConditional (Lit NullLit{} _ _) _ = 
+            execRhsFieldConditional :: ExecutionState -> Expression -> Identifier -> Engine r (ExecutionState, Expression)
+            execRhsFieldConditional state0 (Conditional guard true0 false0 ty info) field = do
+                (state1, true1)  <- execRhsFieldConditional state0 true0 field
+                (state2, false1) <- execRhsFieldConditional state1 false0 field
+                return (state2, Conditional guard true1 false1 ty info)
+            execRhsFieldConditional _ (Lit NullLit{} _ _) _ = 
                 infeasible
-            execRhsFieldConditional (Ref ref _ _) field = 
-                readConcreteField state0 ref field
-            execRhsFieldConditional ref@SymbolicRef{} field =
-                readSymbolicField state0 ref field
-            execRhsFieldConditional _ _ =
+            execRhsFieldConditional state0 (Ref ref _ _) field = 
+                (state0,) <$> readConcreteField state0 ref field
+            execRhsFieldConditional state0 ref@SymbolicRef{} field = do
+                state1 <- initializeSymbolicRef state0 ref
+                (state1,) <$> readSymbolicField state0 ref field
+            execRhsFieldConditional _ _ _ =
                 stop state0 "execRhsFieldConditional: expected a reference or conditional"
   
 execRhs state0 rhs@RhsElem{} = do
@@ -132,7 +132,7 @@ execRhs state0 rhs@RhsArray{} = do
     execNewArray state1 sizes (typeOf rhs)
 
 execRhs state RhsCall{} =
-    stop state "execRhs: Evaluating a method call"
+    stop state "execRhs: evaluating a method call"
 
 execNewArray :: ExecutionState -> [EvaluationResult Int] -> RuntimeType -> Engine r (ExecutionState, Expression)
 execNewArray state [Right size] ty = do

@@ -13,7 +13,7 @@ import           Execution.Effects
 import           Execution.State
 import           Execution.State.Thread
 import           Execution.State.LockSet as LockSet
-import           Execution.State.AliasMap as AliasMap
+import           Execution.State.AliasMap as AliasMap (lookup)
 import           Execution.State.InterleavingConstraints
 import           Execution.Semantics.StackFrame
 import           Analysis.CFA.CFG
@@ -27,13 +27,15 @@ isEnabled state thread
     | (_, _, StatNode (Lock var _ _), _) <- thread ^. pc = do
         ref <- readDeclaration (state & currentThreadId ?~ (thread ^. tid)) var
         case ref of
-            Lit NullLit{} _ _ -> infeasible
-            SymbolicRef{}     -> return True
-            Ref ref _ _       -> 
+            Lit NullLit{} _ _ -> 
+                infeasible
+            SymbolicRef{} -> 
+                return True
+            Ref ref _ _ -> 
                 case LockSet.lookup ref (state ^. locks) of
                     Just tid' -> return (tid' == thread ^. tid)
                     Nothing   -> return True
-            _                 -> 
+            _ -> 
                 stop state ("isEnabled: non-reference '" ++ toString ref ++ "'")
     | (_, _, StatNode (Join _ _), _) <- thread ^. pc = 
         S.null <$> children state (thread ^. tid)
@@ -52,27 +54,27 @@ por state0 threads = do
         then
             return (state0, threads)
         else do
-            uniqueThreads <- filterM (isUniqueInterleaving state0) threads
+            let uniqueThreads = filter (isUniqueInterleaving state0) threads
             measurePrunes (length threads - length uniqueThreads)
-            state1 <- generateConstraints state0 threads
+            state1 <- generate state0 threads
             return (state1, uniqueThreads)
 
-isUniqueInterleaving :: ExecutionState -> Thread -> Engine r Bool
+isUniqueInterleaving :: ExecutionState -> Thread -> Bool
 isUniqueInterleaving state thread = do
     let trace       = state ^. programTrace
     let constraints = state ^. interleavingConstraints
-    return . not . any (isUnique trace) $ constraints
+    not . any (isUnique trace) $ constraints
     where
-        isUnique trace (IndependentConstraint previous current)
-            = (thread ^. pc) == current && previous `elem` trace
-        isUnique _ NotIndependentConstraint{}
-            = False
+        isUnique trace (IndependentConstraint previous current) = 
+            (thread ^. pc) == current && previous `elem` trace
+        isUnique _ NotIndependentConstraint{} = 
+            False
 
-generateConstraints :: ExecutionState -> [Thread] -> Engine r ExecutionState
-generateConstraints state threads = do
+generate :: ExecutionState -> [Thread] -> Engine r ExecutionState
+generate state threads = do
     let pairs = [(x, y) | let list = threads, x <- list, y <- list, x < y]
-    newConstraints <- foldM construct [] pairs
-    updateInterleavingConstraints state newConstraints
+    new <- foldM construct [] pairs
+    return $ updateInterleavingConstraints state new
     where 
         construct :: InterleavingConstraints -> (Thread, Thread) -> Engine r InterleavingConstraints
         construct acc pair@(thread1, thread2) = do
@@ -81,17 +83,17 @@ generateConstraints state threads = do
                 then return (IndependentConstraint (thread1 ^. pc) (thread2 ^. pc) : acc)
                 else return (NotIndependentConstraint (thread1 ^. pc) (thread2 ^. pc) : acc)
 
-updateInterleavingConstraints :: ExecutionState -> InterleavingConstraints -> Engine r ExecutionState
-updateInterleavingConstraints state newConstraints = do
-    let constraints    = state ^. interleavingConstraints
-    let oldConstraints = Prelude.filter (isConflict newConstraints) constraints
-    return $ state & (interleavingConstraints .~ (oldConstraints ++ newConstraints))
+updateInterleavingConstraints :: ExecutionState -> InterleavingConstraints -> ExecutionState
+updateInterleavingConstraints state new = do
+    let original = state ^. interleavingConstraints
+    let filtered = filter (isConflict new) original
+    state & (interleavingConstraints .~ (filtered ++ new))
 
 isConflict :: [InterleavingConstraint] -> InterleavingConstraint -> Bool
-isConflict _              (IndependentConstraint _ _)      = False
-isConflict newConstraints (NotIndependentConstraint x1 y1) =
-    any (\case (IndependentConstraint x2 y2)  -> S.fromList [x1, y1] `S.disjoint` S.fromList [x2, y2]
-               (NotIndependentConstraint _ _) -> False) newConstraints
+isConflict _   IndependentConstraint{}          = False
+isConflict new (NotIndependentConstraint x1 y1) = flip any new $ \case
+    (IndependentConstraint x2 y2) -> S.fromList [x1, y1] `S.disjoint` S.fromList [x2, y2]
+    NotIndependentConstraint{}    -> False
 
 type ReadWriteSet = (S.Set Reference, S.Set Reference)
 
@@ -109,7 +111,7 @@ dependentOperationsOfT state thread = dependentOperationsOfN state (thread ^. ti
 dependentOperationsOfN :: ExecutionState -> ThreadId -> CFGContext -> Engine r ReadWriteSet
 dependentOperationsOfN state tid (_, _, StatNode stat, _) 
     = dependentOperationsOfS state tid stat
-dependentOperationsOfN _ _ _                        
+dependentOperationsOfN _ _ _
     = return (S.empty, S.empty)
 
 -- | Returns the reads and writes of the current statement.
