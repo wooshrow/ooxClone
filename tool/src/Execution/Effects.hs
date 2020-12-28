@@ -71,7 +71,7 @@ unknown state expression = throw $ Unknown (getPos expression) (state ^. program
 finish :: ExecutionState -> Engine r a
 finish state = do
     let trace = reverse $ map (^. _2) (state ^. programTrace)
-    debug ("Finished program path: " ++ toDebugString trace)
+    inform ("Finished program path: " ++ toDebugString trace)
     measureFinish 
     empty
 

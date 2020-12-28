@@ -60,20 +60,6 @@ verify' state0 expression0 = do
                     Undef -> unknown state3 expression3
     return state0
 
-{-
-verify' :: ExecutionState -> Expression -> Engine r ExecutionState
-verify' state0 expression0 = do
-    (state1, concretizations) <- concretesOfType state0 REFRuntimeType expression0
-    _ <- concretizeMap concretizations state1 $ \ state2 -> do
-        expression1 <- substitute state2 expression0
-        measureInvokeZ3
-        (result, _) <- (embed . evalZ3 . verifyZ3) expression1
-        case result of
-            Unsat -> return state2
-            Sat   -> invalid state2 expression1
-            Undef -> unknown state2 expression1
-    return state0
--}
 substitute :: ExecutionState -> Expression -> Engine r Expression
 substitute state = foldExpression algebra
     where
