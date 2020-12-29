@@ -24,14 +24,20 @@ execLhs :: ExecutionState -> Lhs -> Expression -> Engine r ExecutionState
 execLhs state0 lhs@LhsVar{} value =
     writeDeclaration state0 (lhs ^?! SL.var) value
 
-execLhs state lhs@LhsField{} value = do
+execLhs state0 lhs@LhsField{} value = do
     let field = lhs ^?! SL.field
-    ref <- readDeclaration state (lhs ^?! SL.var)
+    ref <- readDeclaration state0 (lhs ^?! SL.var)
     case ref of
-        Lit NullLit{} _ _ -> infeasible
-        Ref ref _ _       -> writeConcreteField state ref field value
-        SymbolicRef{}     -> writeSymbolicField state ref field value
-        _                 -> stop state "execLhs: expected a reference"
+        Lit NullLit{} _ _ -> 
+            infeasible
+        Ref ref _ _ -> 
+            writeConcreteField state0 ref field value
+        SymbolicRef{} -> do
+            state1 <- initializeSymbolicRef state0 ref
+            state2 <- removeSymbolicNull state1 ref
+            writeSymbolicField state2 ref field value
+        _ -> 
+            stop state0 "execLhs: expected a reference"
             
 execLhs state0 lhs@LhsElem{} value = do
     ref <- readDeclaration state0 (lhs ^?! SL.var)
@@ -80,7 +86,8 @@ execRhs state0 rhs@RhsField{} = do
             return (state0, value)
         SymbolicRef{} -> do
             state1 <- initializeSymbolicRef state0 ref
-            value  <- readSymbolicField state1 ref field
+            state2 <- removeSymbolicNull state1 ref
+            value  <- readSymbolicField state2 ref field
             return (state1, value)
         Conditional{} -> 
             execRhsFieldConditional state0 ref field
@@ -98,7 +105,8 @@ execRhs state0 rhs@RhsField{} = do
                 (state0,) <$> readConcreteField state0 ref field
             execRhsFieldConditional state0 ref@SymbolicRef{} field = do
                 state1 <- initializeSymbolicRef state0 ref
-                (state1,) <$> readSymbolicField state0 ref field
+                state2 <- removeSymbolicNull state1 ref
+                (state1,) <$> readSymbolicField state2 ref field
             execRhsFieldConditional _ _ _ =
                 stop state0 "execRhsFieldConditional: expected a reference or conditional"
   

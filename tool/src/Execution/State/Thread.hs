@@ -10,7 +10,6 @@ module Execution.State.Thread(
 import qualified Data.Stack                 as T
 import qualified Data.Map                   as M
 import qualified Text.Pretty                as Pretty
-import           Data.Graph.Inductive.Graph (Node)   
 import           Control.Lens               (makeLenses, (^.))
 import           Analysis.CFA.CFG
 import           Language.Syntax

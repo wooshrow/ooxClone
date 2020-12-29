@@ -103,64 +103,57 @@ fallthrough _            = S.empty
 
 constructStatement :: Members [Error ErrorMessage, State ControlFlowGraph] r 
     => DeclarationMember -> Statement -> Sem r ()
-constructStatement member s
-    = case s of
-        Assign{_lhs,_rhs} -> 
-            insertStatN s
-        Call{_invocation} ->
-            insertStatN s 
-        Ite{_trueBody, _falseBody} -> do
-            insertStatN s 
-            constructStatement member _trueBody 
-            constructStatement member _falseBody
-            insertE (initStatement s) (initStatement _trueBody)
-            insertE (initStatement s) (initStatement _falseBody)
-        While{_guard, _body} -> do
-            insertStatN s 
-            constructStatement member _body
-            insertE (initStatement s) (initStatement _body)
-            insertEs (finalStatement _body) (initStatement s)
-            insertEs (S.filter isContinueN (fallthrough _body)) (initStatement s)
-        Throw{} -> do
-            insertStatN s 
-            insertE (initStatement s) (-1, ExceptionalNode)
-        Try{_tryBody, _catchBody} -> do
-            let (tryEntryNode, tryExitNode)   = (toTryEntryNode s, toTryExitNode s)
-            let (tryCatchNode, catchExitNode) = (toCatchEntryNode s, toCatchExitNode s)
-            insertNs $ S.fromList [tryEntryNode, tryExitNode, tryCatchNode, catchExitNode]
-            constructStatement member _tryBody
-            constructStatement member _catchBody
-            insertE tryEntryNode (initStatement _tryBody)
-            insertEs (finalStatement _tryBody) tryExitNode
-            insertE tryCatchNode (initStatement _catchBody)
-            insertEs (finalStatement _catchBody) catchExitNode
-        Block{_body} -> 
-            constructStatement member _body
-        Fork{_invocation} ->
-            insertStatN s                  
-        Seq{_stat1, _stat2} -> 
-            case _stat1 of
-                Continue{}  
-                    -> constructStatement member _stat1 
-                    <* constructStatement member _stat2 
-                Break{} 
-                    -> constructStatement member _stat1 
-                    <* constructStatement member _stat2 
-                Return{} 
-                    -> constructStatement member _stat1 
-                    <* constructStatement member _stat2
-                Throw{}
-                    -> constructStatement member _stat1 
-                    <* constructStatement member _stat2
-                While{_guard, _body}
-                    -> constructStatement member _stat1 
-                    <* constructStatement member _stat2 
-                    <* insertE (initStatement _stat1) (initStatement _stat2)
-                    <* insertEs (S.filter isBreakN (fallthrough _body)) (initStatement _stat2)
-                _   -> constructStatement member _stat1 
-                    <* constructStatement member _stat2
-                    <* insertEs (finalStatement _stat1) (initStatement _stat2)
-        _   -> insertStatN s
+constructStatement member s = case s of
+    Ite{_trueBody, _falseBody} -> do
+        insertStatN s 
+        constructStatement member _trueBody 
+        constructStatement member _falseBody
+        insertE (initStatement s) (initStatement _trueBody)
+        insertE (initStatement s) (initStatement _falseBody)
+    While{_guard, _body} -> do
+        insertStatN s 
+        constructStatement member _body
+        insertE (initStatement s) (initStatement _body)
+        insertEs (finalStatement _body) (initStatement s)
+        insertEs (S.filter isContinueN (fallthrough _body)) (initStatement s)
+    Throw{} -> do
+        insertStatN s 
+        insertE (initStatement s) (-1, ExceptionalNode)
+    Try{_tryBody, _catchBody} -> do
+        let (tryEntryNode, tryExitNode)   = (toTryEntryNode s, toTryExitNode s)
+        let (tryCatchNode, catchExitNode) = (toCatchEntryNode s, toCatchExitNode s)
+        insertNs $ S.fromList [tryEntryNode, tryExitNode, tryCatchNode, catchExitNode]
+        constructStatement member _tryBody
+        constructStatement member _catchBody
+        insertE tryEntryNode (initStatement _tryBody)
+        insertEs (finalStatement _tryBody) tryExitNode
+        insertE tryCatchNode (initStatement _catchBody)
+        insertEs (finalStatement _catchBody) catchExitNode
+    Block{_body} ->
+        constructStatement member _body     
+    Seq{_stat1, _stat2} ->
+        case _stat1 of
+            Continue{}  
+                -> constructStatement member _stat1 
+                <* constructStatement member _stat2 
+            Break{} 
+                -> constructStatement member _stat1 
+                <* constructStatement member _stat2 
+            Return{} 
+                -> constructStatement member _stat1 
+                <* constructStatement member _stat2
+            Throw{}
+                -> constructStatement member _stat1 
+                <* constructStatement member _stat2
+            While{_guard, _body}
+                -> constructStatement member _stat1 
+                <* constructStatement member _stat2 
+                <* insertE (initStatement _stat1) (initStatement _stat2)
+                <* insertEs (S.filter isBreakN (fallthrough _body)) (initStatement _stat2)
+            _   -> constructStatement member _stat1 
+                <* constructStatement member _stat2
+                <* insertEs (finalStatement _stat1) (initStatement _stat2)
+    _   -> insertStatN s
 
 toNode :: Statement -> CFGNode
 toNode s = (s ^. SL.label, StatNode s)

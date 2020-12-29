@@ -5,7 +5,7 @@ module Execution.Verification(
 
 import qualified Data.Set as S
 import           Polysemy
-import           Z3.Monad
+import           Z3.Monad hiding (substitute)
 import           Control.Monad (void)
 import           Control.Lens
 import           Text.Pretty

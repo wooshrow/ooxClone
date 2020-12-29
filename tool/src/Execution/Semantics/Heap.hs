@@ -24,7 +24,6 @@ import           Execution.Effects
 import           Execution.State
 import           Execution.State.Heap as Heap
 import           Execution.State.AliasMap as AliasMap
-import {-# SOURCE #-} Execution.Semantics.Concretization (initializeSymbolicRef, removeSymbolicNull)
 import           Language.Syntax
 import           Language.Syntax.DSL
 import qualified Language.Syntax.Lenses as SL
@@ -56,9 +55,7 @@ writeConcreteField state ref field value =
             stop state ("writeConcreteField: dereference of uninitialized ref '" ++ toString ref ++ "'")
 
 writeSymbolicField :: ExecutionState -> Expression -> Identifier -> Expression -> Engine r ExecutionState
-writeSymbolicField state0 ref@SymbolicRef{} field value = do
-    state1 <- initializeSymbolicRef state0 ref
-    state2 <- removeSymbolicNull state1 ref
+writeSymbolicField state2 ref@SymbolicRef{} field value =
     case AliasMap.lookup (ref ^?! SL.var) (state2 ^. aliasMap) of
         Just aliases -> 
             if S.size aliases == 1
@@ -105,9 +102,7 @@ readConcreteField state ref field =
             stop state ("readConcreteField: dereference of uninitialized ref '" ++ toString ref ++ "'")
 
 readSymbolicField :: ExecutionState -> Expression -> Identifier -> Engine r Expression
-readSymbolicField state0 ref@SymbolicRef{} field = do
-    state1 <- initializeSymbolicRef state0 ref
-    state2 <- removeSymbolicNull state1 ref
+readSymbolicField state2 ref@SymbolicRef{} field =
     case AliasMap.lookup (ref ^?! SL.var) (state2 ^. aliasMap) of
         Just aliases -> do
             options <- mapM (readSymbolicAliasField state2) (S.toList aliases)

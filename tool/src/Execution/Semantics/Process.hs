@@ -39,7 +39,8 @@ despawnCurrentThread state0
 despawn :: ExecutionState -> Thread -> Engine r ExecutionState
 despawn state thread = do
     debug ("Despawning thread with id '" ++ toDebugString (thread ^. tid) ++ "'")
-    return $ state & (threads %~ S.delete thread)
+    let index = S.findIndex thread (state ^. threads)
+    return $ state & (threads %~ S.deleteAt index)
 
 freshTid :: ExecutionState -> ThreadId
 freshTid state = ThreadId (1 + state ^. numberOfForks)
