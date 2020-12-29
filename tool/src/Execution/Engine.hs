@@ -16,10 +16,11 @@ import           Language.Syntax
 import qualified Language.Syntax.Lenses as SL
 import           Analysis.CFA.CFG
 import           Analysis.SymbolTable
+import           Execution.Effects
+import           Execution.Errors
 import           Execution.Semantics
 import           Execution.Semantics.Concretization
 import           Execution.Semantics.PartialOrderReduction
-import           Execution.Effects
 import           Execution.State
 import           Execution.State.Thread
 import           Execution.Result
@@ -97,8 +98,8 @@ execT state0 (_, _, StatNode (Call invocation _ _), [(_, neighbour)]) = do
     (state1, entry) <- execInvocation state0 invocation Nothing neighbour
     step state1 ((), entry)
 
-execT state0 (_, _, StatNode Call{}, ns) =
-    stop state0 ("execT: there should be exactly 1 neighbour, there are '" ++ show (length ns) ++ "'")
+execT state0 (_, _, StatNode Call{}, neighbours) =
+    stop state0 (expectedNumberOfNeighboursErrorMessage "execT" 1 (length neighbours))
 
 -- A Member Entry
 execT state0 (_, _, MemberEntry{}, neighbours) = do
@@ -111,7 +112,7 @@ execT state0 (_, _, MemberExit returnTy _ _ _, []) = do
     uncurry stepM state1
 
 execT state0 (_, _, MemberExit{}, neighbours) =
-    stop state0 ("execT: there should be exactly 0 neighbour, there are '" ++ show (length neighbours) ++ "'")
+    stop state0 (expectedNumberOfNeighboursErrorMessage "execT" 0 (length neighbours))
 
 -- A Try Entry
 execT state0 (_, _, TryEntry handler, neighbours) = do
@@ -222,4 +223,4 @@ branch f options = do
     foldr (\ x a -> f x <|> a) empty options
 
 branch' :: (Foldable f, Alternative f) => (a -> Engine r b) -> f a -> Engine r b
-branch' f options = foldr (\ x a -> f x <|> a) empty options
+branch' f = foldr (\ x a -> f x <|> a) empty

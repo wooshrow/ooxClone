@@ -39,6 +39,7 @@ import           Execution.Semantics.Heap
 import           Execution.Semantics.Process
 import           Execution.Semantics.Assignment
 import           Execution.Effects
+import           Execution.Errors
 import           Execution.State
 import           Execution.State.Thread
 import           Execution.State.Heap
@@ -74,8 +75,8 @@ execAssertEnsures state = do
                     let frame   = fromJust (getLastStackFrame thread)
                     let ensures = frame ^. currentMember ^?! SL.specification ^?! SL.ensures
                     maybe (return state) (execAssert state) ensures
-                Nothing     ->
-                    stop state "execAssertEnsures: cannot get current thread"
+                Nothing ->
+                    stop state (cannotGetCurrentThreadErrorMessage "execAssertEnsures")
         else 
             return state
 
@@ -89,8 +90,8 @@ execAssertRequires state = do
                     let frame    = fromJust (getLastStackFrame thread)
                     let requires = frame ^. currentMember ^?! SL.specification ^?! SL.requires
                     maybe (return state) (execAssert state) requires
-                Nothing     ->
-                    stop state "execAssertRequires: cannot get current thread"
+                Nothing ->
+                    stop state (cannotGetCurrentThreadErrorMessage "execAssertRequires")
         else 
             return state
 
@@ -105,7 +106,7 @@ execAssertExceptional state = do
                     let exceptional = frame ^. currentMember ^?! SL.specification ^?! SL.exceptional
                     maybe (return state) (execAssert state) exceptional
                 Nothing     ->
-                    stop state "execAssertExceptional: cannot get current thread"
+                    stop state (cannotGetCurrentThreadErrorMessage "execAssertExceptional")
         else
             return state
 
@@ -142,10 +143,10 @@ execInvocation state0 invocation lhs neighbour
                 Constructor _ _ _ _ labels _ -> do
                     state3 <- execConstructor state2 member arguments lhs neighbour
                     return (state3, fst labels)
-                Field{} -> 
-                    stop state2 "execInvocation: invocation resolved to a field"
+                Field _ name _ -> 
+                    stop state2 (expectedMethodMemberErrorMessage "execInvocation" name)
     | otherwise = 
-        stop state0 "execInvocation: unresolved invocation target"
+        stop state0 (unresolvedErrorMessage "execInvocation")
 
 execStaticMethod :: ExecutionState -> DeclarationMember -> [Expression] -> Maybe Lhs -> Node -> Engine r ExecutionState
 execStaticMethod state method arguments lhs neighbour = do
@@ -178,7 +179,7 @@ execFork state member arguments
     | Just parent <- state ^. currentThreadId =
         spawn state parent member arguments
     | otherwise = 
-        stop state "execFork: cannot get current thread"
+        stop state (cannotGetCurrentThreadErrorMessage "execFork")
 
 execMemberEntry :: ExecutionState -> Engine r ExecutionState
 execMemberEntry state =
@@ -200,7 +201,7 @@ execMemberExit state0 returnTy = do
         else
             case getCurrentThread state1 of
                 Nothing ->
-                        stop state1 "execMemberExit: cannot get current thread"
+                        stop state1 (cannotGetCurrentThreadErrorMessage "execMemberExit")
                 Just thread1 -> do
                     let oldFrame  = fromJust (getLastStackFrame thread1)
                     let neighbour = Just ((), oldFrame ^. returnPoint)
@@ -276,22 +277,22 @@ execLock state0 var = do
         Ref ref _ _       ->
             case state0 ^. currentThreadId of
                 Nothing         -> 
-                    stop state0 "execLock: cannot get current thread"
+                    stop state0 (cannotGetCurrentThreadErrorMessage "execLock")
                 Just currentTid -> 
                     case LockSet.lookup ref (state0 ^. locks) of
                         Just tid -> if tid == currentTid then return state0 else infeasible
                         Nothing  -> return $ state0 & (locks %~ LockSet.insert ref currentTid)
         _                 -> 
-            stop state0 "execLock: expected a reference"
+            stop state0 (expectedReferenceErrorMessage "execLock" ref)
 
 execUnlock :: ExecutionState -> Identifier -> Engine r ExecutionState
 execUnlock state var = do
     ref <- readDeclaration state var
     case ref of
-        Lit NullLit{} _ _ -> stop state "execT: null in unlock statement."
-        SymbolicRef{}     -> stop state "execT: symbolic reference in unlock statement."
-        Ref ref _ _       -> return $ state & (locks %~ LockSet.remove ref)
-        _                 -> stop state "execUnlock: expected a reference"
+        Ref ref _ _ -> 
+            return $ state & (locks %~ LockSet.remove ref)
+        _ -> 
+            stop state (expectedConcreteReferenceErrorMessage "execUnock" ref)
 
 execAssign :: ExecutionState -> Lhs -> Rhs -> Engine r ExecutionState
 execAssign state0 _ RhsCall{} = 

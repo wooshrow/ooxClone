@@ -29,6 +29,7 @@ executable app
                           , Execution.Phase
                           , Execution.Engine
                           , Execution.Effects
+                          , Execution.Errors
                           , Execution.Semantics
                           , Execution.Semantics.Concretization
                           , Execution.Semantics.StackFrame

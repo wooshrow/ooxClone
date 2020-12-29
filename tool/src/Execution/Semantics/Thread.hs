@@ -10,6 +10,7 @@ import           Execution.Semantics.StackFrame
 import           Execution.Semantics.Exception
 import           Execution.Semantics.Evaluation
 import           Execution.Effects
+import           Execution.Errors
 import           Execution.State
 import           Execution.State.Thread
 import           Language.Syntax
@@ -23,7 +24,7 @@ pushStackFrameOnCurrentThread state returnPoint member lhs params
     | Just tid <- state ^. currentThreadId = 
         pushStackFrame state tid returnPoint member lhs params
     | otherwise =
-        stop state "pushStackFrameOnCurrentThread: cannot get current thread"
+        stop state (cannotGetCurrentThreadErrorMessage "pushStackFrameOnCurrentThread")
 
 pushStackFrame :: ExecutionState -> ThreadId -> Node -> DeclarationMember -> Maybe Lhs -> [(Parameter, Expression)] -> Engine r ExecutionState
 pushStackFrame state0 tid returnPoint member lhs params = do
@@ -35,7 +36,7 @@ pushStackFrame state0 tid returnPoint member lhs params = do
             let thread1 = thread0 & (callStack %~ T.push frame1)
             return $ updateThreadInState state2 thread1
         Nothing      ->
-            stop state1 ("pushStackFrame: cannot get thread with thread id'" ++ toDebugString tid ++ "'")
+            stop state1 (cannotGetThreadErrorMessage "pushStackFrame" tid)
 
 writeParam :: Thread -> (ExecutionState, StackFrame) -> (Parameter, Expression) -> Engine r (ExecutionState, StackFrame)
 writeParam thread (stateN, frameN) (Parameter _ name _, value0)
@@ -57,7 +58,7 @@ popStackFrame state0 = do
             let thread1 = thread0 & (callStack %~ T.pop)
             return $ updateThreadInState state1 thread1
         Nothing     -> 
-            stop state1 "popStackFrame: cannot get current thread"
+            stop state1 (cannotGetCurrentThreadErrorMessage "popStackFrame")
 
 isLastStackFrame :: ExecutionState -> Bool
 isLastStackFrame state =

@@ -21,6 +21,7 @@ import           Control.Lens ((&), (^?!), (^.), (%~), (.~), element, Field2(_2)
 import           Data.Positioned
 import           Analysis.Type.Typeable
 import           Execution.Effects
+import           Execution.Errors
 import           Execution.State
 import           Execution.State.Heap as Heap
 import           Execution.State.AliasMap as AliasMap
@@ -50,10 +51,10 @@ writeConcreteField state ref field value =
             let newStructure = ObjectValue (M.insert field value values) ty
             return $ state & (heap %~ Heap.insert ref newStructure)
         Just (ArrayValue values) ->
-             stop state ("writeConcreteField: array value '" ++ toString values ++ "'")
+             stop state (expectedObjectErrorMessage "writeConcreteField")
         Nothing ->
-            stop state ("writeConcreteField: dereference of uninitialized ref '" ++ toString ref ++ "'")
-
+            stop state (uninitializedReferenceErrorMessage "writeConcreteField" ref)
+            
 writeSymbolicField :: ExecutionState -> Expression -> Identifier -> Expression -> Engine r ExecutionState
 writeSymbolicField state2 ref@SymbolicRef{} field value =
     case AliasMap.lookup (ref ^?! SL.var) (state2 ^. aliasMap) of
@@ -65,7 +66,7 @@ writeSymbolicField state2 ref@SymbolicRef{} field value =
                 else 
                     foldM writeSymbolicAliasField state2 aliases
         Nothing -> 
-            stop state2 "writeSymbolicField: no aliases"
+            stop state2 (noAliasesErrorMessage "writeSymbolicField")
     where
         writeSymbolicAliasField :: ExecutionState -> Expression -> Engine r ExecutionState
         writeSymbolicAliasField stateN alias@Ref{} = do
@@ -76,8 +77,8 @@ writeSymbolicField state2 ref@SymbolicRef{} field value =
 writeSymbolicField _ (Lit NullLit{} _ _) _ _ = 
     infeasible
 
-writeSymbolicField state _ _ _ =
-    stop state "writeSymbolicField: non-reference"
+writeSymbolicField state value _ _ =
+    stop state (expectedSymbolicReferenceErrorMessage "writeSymbolicField" value)
 
 readConcreteField :: ExecutionState -> Reference -> Identifier -> Engine r Expression
 readConcreteField state ref field = 
@@ -95,11 +96,11 @@ readConcreteField state ref field =
                 Just value ->
                     return value
                 Nothing -> 
-                    stop state ("readConcreteField: " ++ toString field)
+                    stop state (readOfUndeclaredFieldErrorMessge "readConcreteField" field)
         Just (ArrayValue values) ->
-             stop state ("readConcreteField: array value '" ++ toString values ++ "'")
+             stop state (expectedObjectErrorMessage "readConcreteField")
         Nothing ->
-            stop state ("readConcreteField: dereference of uninitialized ref '" ++ toString ref ++ "'")
+            stop state (uninitializedReferenceErrorMessage "readConcreteField" ref)
 
 readSymbolicField :: ExecutionState -> Expression -> Identifier -> Engine r Expression
 readSymbolicField state2 ref@SymbolicRef{} field =
@@ -107,13 +108,13 @@ readSymbolicField state2 ref@SymbolicRef{} field =
         Just aliases -> do
             options <- mapM (readSymbolicAliasField state2) (S.toList aliases)
             return $ foldr (\ (concRef, value) -> conditional' (ref `equal'` concRef) value) (head options ^. _2) (tail options)
-        Nothing      -> stop state2 "readSymbolicField: no aliases"
+        Nothing      -> stop state2 (noAliasesErrorMessage "readSymbolicField")
     where
         readSymbolicAliasField :: ExecutionState -> Expression -> Engine r (Expression, Expression)
         readSymbolicAliasField stateN ref = (ref, ) <$> readConcreteField stateN (ref ^?! SL.ref) field
 
-readSymbolicField state _ _ =
-    stop state "readSymbolicField: non-reference"
+readSymbolicField state ref _ =
+    stop state (expectedReferenceErrorMessage "readSymbolicField" ref)
 
 --------------------------------------------------------------------------------
 -- Array handling
@@ -124,9 +125,9 @@ sizeof state ref = case dereference state ref of
     Just (ArrayValue elements) ->
         return (length elements)
     Just ObjectValue{} ->
-        stop state "sizeof: derefence of object"
+        stop state (expectedArrayErrorMessage "sizeof")
     Nothing ->
-        stop state ("sizeof: dereference of uninitialized ref '" ++ toString ref ++ "'")
+        stop state (uninitializedReferenceErrorMessage "sizeof" ref)
 
 readConcreteElem :: ExecutionState -> Reference -> Int -> Engine r Expression
 readConcreteElem state ref index = case dereference state ref of
@@ -134,10 +135,10 @@ readConcreteElem state ref index = case dereference state ref of
         | index >= 0 && index < length values -> return (values ^?! element index)
         | otherwise -> infeasible
     Just ObjectValue{} ->
-        stop state "readConcreteElem: dereference of object"
+        stop state (expectedArrayErrorMessage "readConcreteElem")
     Nothing ->
-        stop state ("readConcreteElem: dereference of uninitialized ref '" ++ toString ref ++ "'")
-
+        stop state (uninitializedReferenceErrorMessage "readConcreteElem" ref)
+        
 readSymbolicElem :: ExecutionState -> Reference -> Expression -> Engine r Expression
 readSymbolicElem state ref index = case dereference state ref of
     Just (ArrayValue values) -> do
@@ -145,9 +146,9 @@ readSymbolicElem state ref index = case dereference state ref of
         let value = foldr (\ (value, concIndex) -> conditional' (index `equal'` concIndex) value) (values ^?! _head) (zip (values ^?! _tail) indices)
         return value
     Just ObjectValue{} ->
-        stop state "readSymbolicElem: dereference of object"
+        stop state (expectedArrayErrorMessage "readSymbolicElem")
     Nothing ->
-        stop state ("readSymbolicElem: dereference of uninitialized ref '" ++ toString ref ++ "'")
+        stop state (uninitializedReferenceErrorMessage "readSymbolicElem" ref)
 
 writeConcreteElem :: ExecutionState -> Reference -> Int -> Expression -> Engine r ExecutionState
 writeConcreteElem state ref index value = case dereference state ref of
@@ -158,9 +159,9 @@ writeConcreteElem state ref index value = case dereference state ref of
         | otherwise -> 
             infeasible
     Just ObjectValue{} ->
-        stop state "writeConcreteElem: dereference of object"
+        stop state (expectedArrayErrorMessage "writeConcreteElem")
     Nothing ->             
-        stop state ("writeConcreteElem: dereference of uninitialized ref '" ++ toString ref ++ "'")
+        stop state (uninitializedReferenceErrorMessage "writeConcreteElem" ref)
 
 writeSymbolicElem :: ExecutionState -> Reference -> Expression -> Expression -> Engine r ExecutionState
 writeSymbolicElem state ref index value = case dereference state ref of
@@ -169,6 +170,6 @@ writeSymbolicElem state ref index value = case dereference state ref of
         let newStructure = ArrayValue $ zipWith (\ oldValue concIndex -> conditional' (index `equal'` concIndex) value oldValue) values indices
         return $ state & (heap %~ Heap.insert ref newStructure)
     Just ObjectValue{} ->
-        stop state "writeSymbolicElem: dereference of object"
+        stop state (expectedArrayErrorMessage "writeSymbolicElem")
     Nothing ->
-        stop state ("writeSymbolicElem: dereference of uninitialized ref '" ++ toString ref ++ "'")
+        stop state  (uninitializedReferenceErrorMessage "writeSymbolicElem" ref)

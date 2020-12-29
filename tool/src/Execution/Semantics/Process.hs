@@ -11,6 +11,7 @@ import           Analysis.CFA.CFG
 import           Control.Lens ((&), (^?!), (^.), (%~), (+~), (.~), Field1(_1))
 import           Execution.Semantics.Thread
 import           Execution.Effects
+import           Execution.Errors
 import           Execution.State
 import           Execution.State.Thread
 import           Language.Syntax
@@ -34,7 +35,7 @@ despawnCurrentThread state0
         state1 <- despawn state0 thread
         return $ state1 & (currentThreadId .~ Nothing)
     | otherwise =
-        stop state0 "despawnCurrentThread: cannot get current thread"
+        stop state0 (cannotGetCurrentThreadErrorMessage "despawnCurrentThread")
 
 despawn :: ExecutionState -> Thread -> Engine r ExecutionState
 despawn state thread = do

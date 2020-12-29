@@ -24,18 +24,23 @@ data ErrorType
     = LexicalError     { message :: String }
     | SyntacticalError { message :: String }
     | SemanticalError  { message :: String }
+    | OtherError       { message :: String }
     deriving (Show)
 
 instance Pretty ErrorType where
     pretty LexicalError{..}     = pretty message
     pretty SyntacticalError{..} = pretty message
     pretty SemanticalError{..}  = pretty message
+    pretty OtherError{..}       = pretty message
 
 lexicalError :: Position -> String -> ErrorMessage
 lexicalError pos = ErrorMessage (Just pos) . LexicalError 
 
 syntacticalError :: Position -> String -> ErrorMessage
 syntacticalError pos = ErrorMessage (Just pos) . SyntacticalError
+
+otherError :: String -> ErrorMessage
+otherError = ErrorMessage Nothing . OtherError
 
 readOfUndeclaredVarError :: Identifier -> ErrorMessage
 readOfUndeclaredVarError (Identifier var pos) 

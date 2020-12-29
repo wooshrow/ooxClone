@@ -6,6 +6,7 @@ import qualified Data.Set as S
 import           Text.Pretty
 import           Control.Lens ((&), (^.), (%~))
 import           Execution.Effects
+import           Execution.Errors
 import           Execution.State
 import           Execution.State.Thread
 import           Execution.State.AliasMap as AliasMap
@@ -20,10 +21,10 @@ writeDeclaration state var value
                 let newFrame = writeDeclarationOnFrame oldFrame var value
                 let thread1  = thread0 & (callStack %~ T.updateTop newFrame)
                 return $ updateThreadInState state thread1
-            Nothing       -> 
-                stop state "writeDeclaration: no stack frame"
+            Nothing -> 
+                stop state (cannotGetCurrentStackFrameErrorMessage "writeDeclaration")
     | otherwise = 
-        stop state "writeDeclaration: cannot get current thread"
+        stop state (cannotGetCurrentThreadErrorMessage "writeDeclaration")
 
 writeDeclarationOnFrame :: StackFrame -> Identifier -> Expression -> StackFrame
 writeDeclarationOnFrame frame var value = frame & (declarations %~ M.insert var value)
@@ -35,7 +36,7 @@ readDeclaration state var
             Just frame ->
                 case (frame ^. declarations) M.!? var of
                     Nothing ->
-                        stop state ("readDeclaration: failed to read variable " ++ toDebugString var)
+                        stop state (readOfUndeclaredVariableErrorMessage "readDeclaration" var)
                     Just value@(SymbolicRef ref _ _) ->
                         case AliasMap.lookup ref (state ^. aliasMap) of
                             Nothing -> 
@@ -47,9 +48,9 @@ readDeclaration state var
                     Just value ->
                         return value
             Nothing    ->
-                stop state "readDeclaration: no stack frame"
+                stop state (cannotGetCurrentStackFrameErrorMessage "readDeclaration")
     | otherwise = 
-        stop state "readDeclaration: cannot get current thread"
+        stop state (cannotGetCurrentThreadErrorMessage "readDeclaration")
 
 getLastStackFrame :: Thread -> Maybe StackFrame
 getLastStackFrame thread = T.peek (thread ^. callStack)

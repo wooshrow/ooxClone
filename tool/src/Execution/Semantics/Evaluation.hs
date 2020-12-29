@@ -18,6 +18,7 @@ import Execution.Semantics.StackFrame
 import Execution.Semantics.Heap
 import Execution.Semantics.Concretization
 import Execution.Effects
+import Execution.Errors
 import Execution.State
 import Execution.State.Heap
 import Execution.Result
@@ -94,12 +95,13 @@ substitute state0 expression = foldExpression algebra expression state0
             , fSizeOf = \ var _ _ state1 -> do
                 ref <- readDeclaration state1 var
                 case ref of 
-                    Lit NullLit{} _ _ -> infeasible
-                    SymbolicRef{}     -> stop state1 "substitute: SizeOf of symbolic reference"
+                    Lit NullLit{} _ _ -> 
+                        infeasible
                     Ref ref _ _       -> do
                         size <- fmap (lit' . intLit') (sizeof state1 ref)
                         return (state1, size)
-                    _                 -> stop state1 "substitute: SizeOf of non-reference"
+                    _ -> 
+                        stop state1 (expectedConcreteReferenceErrorMessage "substitute" ref)
 
             , fRef = \ ref ty pos state1 ->
                 return (state1, Ref ref ty pos)
@@ -159,10 +161,8 @@ evaluate' state0 expression = foldExpression algebra expression state0
                     Ref ref _ _ -> do
                         size <- fmap (lit' . intLit') (sizeof state1 ref)
                         return (state1, size)
-                    SymbolicRef{} ->
-                        stop state1 "evaluate: SizeOf of symbolic reference"
                     _ -> 
-                        stop state1 "evaluate: SizeOf of non-reference"
+                        stop state1 (expectedConcreteReferenceErrorMessage "evaluate'" ref)
 
             , fRef = \ ref ty pos state1 -> 
                 return (state1, Ref ref ty pos)
@@ -188,8 +188,6 @@ evaluateQuantifier quantifier element range domain formula _ _ state0 = do
     case ref of
         Lit NullLit{} _ _ -> 
             infeasible
-        SymbolicRef{} -> 
-            stop state0 "evaluateQuantifier: symbolic reference"
         Ref ref _ _ ->
             case dereference state0 ref of
                 Just (ArrayValue values) -> do
@@ -201,11 +199,11 @@ evaluateQuantifier quantifier element range domain formula _ _ state0 = do
                     -- TODO: the alias map needs to be extracted from formulas and passed on
                     evaluate state0 (quantifier (map snd formulas))
                 Just ObjectValue{} ->
-                    stop state0 "evaluateQuantifier: dereference of object"
+                    stop state0 (expectedArrayErrorMessage "evaluateQuantifier")
                 Nothing ->
-                    stop state0 ("evaluateQuantifier: dereference of uninitialized ref '" ++ toString ref ++ "'")
+                    stop state0 (uninitializedReferenceErrorMessage "evaluateQuantifier" ref)
         _ ->
-            stop state0 "evaluateQuantifier: non-reference"
+            stop state0 (expectedConcreteReferenceErrorMessage "evaluateQuantifier" ref)
 
 evaluateBinOp :: ExecutionState -> BinOp -> Expression -> Expression ->  RuntimeType -> Position -> Engine r Expression
 -- Boolean Evaluation
@@ -213,7 +211,7 @@ evaluateBinOp state op (Lit (BoolLit a _) _ _) (Lit (BoolLit b _) _ _) ty pos = 
     lit <- case op of Implies  -> return (BoolLit (not a || b)); And   -> return (BoolLit (a && b))
                       Or       -> return (BoolLit (a || b))    ; Equal -> return (BoolLit (a == b))
                       NotEqual -> return (BoolLit (a /= b))    
-                      _        -> stop state "evaluateBinOp: unsupported operator"
+                      _        -> stop state (unsupportedOperatorErrorMessage "evaluateBinOp")
     return $ Lit (lit pos) ty pos
 
 evaluateBinOp __ op expressionA@(Lit (BoolLit a _) _ _) expressionB ty pos =
@@ -240,32 +238,32 @@ evaluateBinOp state op (Lit (IntLit a _) _ _) (Lit (IntLit b _) _ _) ty pos = do
                       Plus        -> return (IntLit  (a + b))   ; Minus            -> return (IntLit  (a - b))
                       Multiply    -> return (IntLit  (a * b))   ; Divide           -> return (IntLit (a `div` b))
                       Modulo      -> return (IntLit (a `mod` b))
-                      _           -> stop state "evaluateBinOp: unsupported operator"
+                      _           -> stop state (unsupportedOperatorErrorMessage "evaluateBinOp")
     return $ Lit (lit pos) ty pos
 
 -- Reference Evaluation
 evaluateBinOp state op (Ref a _ _) (Ref b _ _) ty pos = do
     lit <- case op of Equal    -> return (BoolLit (a == b)) 
                       NotEqual -> return (BoolLit (a /= b))
-                      _        -> stop state "evaluateBinOp: unsupported operator"
+                      _        -> stop state (unsupportedOperatorErrorMessage "evaluateBinOp")
     return $ Lit (lit pos) ty pos
     
 evaluateBinOp state op Ref{} (Lit (NullLit _) _ _) ty pos = do
     lit <- case op of Equal    -> return (BoolLit False)
                       NotEqual -> return (BoolLit True)
-                      _        -> stop state "evaluateBinOp: unsupported operator"
+                      _        -> stop state (unsupportedOperatorErrorMessage "evaluateBinOp")
     return $ Lit (lit pos) ty pos
 
 evaluateBinOp state op (Lit (NullLit _) _ _)  Ref{} ty pos = do
     lit <- case op of Equal    -> return (BoolLit False)
                       NotEqual -> return (BoolLit True)
-                      _        -> stop state "evaluateBinOp: unsupported operator"
+                      _        -> stop state (unsupportedOperatorErrorMessage "evaluateBinOp")
     return $ Lit (lit pos) ty pos
 
 evaluateBinOp state op (Lit (NullLit _) _ _) (Lit (NullLit _) _ _) ty pos = do
     lit <- case op of Equal    -> return (BoolLit True)
                       NotEqual -> return (BoolLit False)
-                      _        -> stop state "evaluateBinOp: unsupported operator"
+                      _        -> stop state (unsupportedOperatorErrorMessage "evaluateBinOp")
     return $ Lit (lit pos) ty pos
 
 evaluateBinOp state op expressionA@(SymbolicRef a _ _) expressionB@(SymbolicRef b _ _) ty pos
@@ -273,7 +271,7 @@ evaluateBinOp state op expressionA@(SymbolicRef a _ _) expressionB@(SymbolicRef 
         = case op of
                 Equal    -> return $ Lit (BoolLit True pos) ty pos
                 NotEqual -> return $ Lit (BoolLit False pos) ty pos
-                _        -> stop state "evaluateBinOp: unsupported operator"
+                _        -> stop state (unsupportedOperatorErrorMessage "evaluateBinOp")
     | otherwise
         = return $ BinOp op expressionA expressionB ty pos
 

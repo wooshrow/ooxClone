@@ -30,6 +30,7 @@ import qualified Language.Syntax.Lenses as SL
 import           Analysis.Type.Typeable
 import           Analysis.SymbolTable
 import           Execution.Effects
+import           Execution.Errors
 import           Execution.State
 import           Execution.State.Heap
 import           Execution.State.AliasMap as AliasMap
@@ -69,7 +70,7 @@ concretesOfTypes state0 ty formulas
         let mappings = map (\ ref -> map (ref ^?! SL.var, ) (S.toList (fromMaybe (error "concretesOfType") (AliasMap.lookup (ref ^?! SL.var) (state1 ^. aliasMap))))) (S.toList refs)
         return (state1, map M.fromList (sequence mappings))
     | otherwise =
-        stop state0 "concretesOfTypes: cannot get current thread"
+        stop state0 (cannotGetCurrentThreadErrorMessage "concretesOfTypes")
 
 concretesOfTypeM :: ExecutionState -> RuntimeType -> Maybe Expression -> Engine r (ExecutionState, [Concretization])
 concretesOfTypeM state ty = maybe (return (state, [])) (concretesOfType state ty)
@@ -82,7 +83,7 @@ concretesOfType state0 ty formula
         let mappings = map (\ ref -> map (ref ^?! SL.var, ) (S.toList (fromMaybe (error "concretesOfType") (AliasMap.lookup (ref ^?! SL.var) (state1 ^. aliasMap))))) (S.toList refs)
         return (state1, map M.fromList (sequence mappings))
     | otherwise =
-        stop state0 "concretesOfType: cannot get current thread"
+        stop state0 (cannotGetCurrentThreadErrorMessage "concretesOfType")
 
 findSymbolicRefsOfType :: ExecutionState -> RuntimeType -> Expression -> Engine r (S.Set Expression)
 findSymbolicRefsOfType state ty = foldExpression algebra
@@ -111,12 +112,16 @@ findSymbolicRefsOfType state ty = foldExpression algebra
             ,-} fSizeOf = \ var _ _ -> do
                 ref <- readDeclaration state var
                 case ref of
-                    Lit NullLit{} _ _     -> return S.empty
-                    Ref{}                 -> return S.empty
+                    Lit NullLit{} _ _ -> 
+                        return S.empty
+                    Ref{} -> 
+                        return S.empty
                     SymbolicRef _ varTy _ -> return $ if varTy `isOfType` ty 
                         then S.singleton ref
                         else S.empty
-                        
+                    _ ->
+                        stop state (expectedReferenceErrorMessage "findSymbolicRefsOfType" ref)
+
             , fSymRef = \ symVar varTy varPos ->
                 return $ if varTy `isOfType` ty 
                         then S.singleton (SymbolicRef symVar varTy varPos) 
@@ -135,8 +140,8 @@ initializeSymbolicRef state var@(SymbolicRef ref ty _)
     | otherwise =
         initializeSymbolicObject state var
 
-initializeSymbolicRef state _ =
-    stop state "initializeSymbolicRef: expected a symbolic reference"
+initializeSymbolicRef state var =
+    stop state (expectedSymbolicReferenceErrorMessage "initializeSymbolicRef" var)
 
 createSymbolicVar :: Typeable a => Identifier -> a -> Expression
 createSymbolicVar (Identifier name pos) ty
@@ -157,8 +162,8 @@ initializeSymbolicArrays state0 var@(SymbolicRef ref ty _) = do
     debug ("Initializing symbolic reference '" ++ toString var ++ ":" ++ toString ty ++ "' to '" ++ toString cases ++ "'")
     return $ state1 & (aliasMap %~ AliasMap.insert ref cases)
 
-initializeSymbolicArrays state _ =
-    stop state "initializeSymbolicArrays: expected a symbolic reference"
+initializeSymbolicArrays state ref =
+    stop state (expectedSymbolicReferenceErrorMessage "initializeSymbolicArrays" ref)
 
 initializeSymbolicArray :: ExecutionState -> Expression -> Int -> Engine r (ExecutionState, Expression)
 initializeSymbolicArray state (SymbolicRef _ ty _) size = do
@@ -167,8 +172,8 @@ initializeSymbolicArray state (SymbolicRef _ ty _) size = do
     structure <- ArrayValue <$> mapM (initializeSymbolicElem state elemTy) indices
     allocate state structure
     
-initializeSymbolicArray state _ _ =
-    stop state "initializeSymbolicArray: expected a symbolic reference"
+initializeSymbolicArray state ref _ =
+    stop state (expectedSymbolicReferenceErrorMessage "initializeSymbolicArray" ref)
 
 initializeSymbolicElem :: ExecutionState -> RuntimeType -> Int -> Engine r Expression
 initializeSymbolicElem state ty index = do
@@ -193,7 +198,7 @@ initializeSymbolicObject state0 var@(SymbolicRef ref ty _) = do
     return $ state1 & (aliasMap %~ AliasMap.insert ref cases)
 
 initializeSymbolicObject state0 expression =
-    stop state0 ("initializeSymbolicObject: non-symbolic reference '" ++ toString expression ++ "'")
+    stop state0 (expectedSymbolicReferenceErrorMessage "initializeSymbolicObject" expression)
 
 initializeSymbolicField :: ExecutionState -> DeclarationMember -> Engine r (Identifier, Expression)
 initializeSymbolicField state field = do
@@ -215,3 +220,6 @@ removeSymbolicNull state (SymbolicRef ref _ _)
         return $ state & (aliasMap %~ AliasMap.insert ref filtered)
     | otherwise =
         return state
+
+removeSymbolicNull state ref =
+    stop state (expectedSymbolicReferenceErrorMessage "removeSymbolicNull" ref)

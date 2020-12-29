@@ -10,6 +10,7 @@ import           Text.Pretty
 import           Data.Configuration
 import           Data.Statistics
 import           Execution.Effects
+import           Execution.Errors
 import           Execution.State
 import           Execution.State.Thread
 import           Execution.State.LockSet as LockSet
@@ -36,7 +37,7 @@ isEnabled state thread
                     Just tid' -> return (tid' == thread ^. tid)
                     Nothing   -> return True
             _ -> 
-                stop state ("isEnabled: non-reference '" ++ toString ref ++ "'")
+                stop state (expectedReferenceErrorMessage "isEnabled" ref)
     | (_, _, StatNode (Join _ _), _) <- thread ^. pc = 
         S.null <$> children state (thread ^. tid)
     | otherwise = 
@@ -153,6 +154,6 @@ getReferences state tid var = do
         SymbolicRef{}     ->
             case AliasMap.lookup (ref ^?! SL.var) (state ^. aliasMap) of
                 Just aliases -> return . S.map (^?! SL.ref) . S.filter (/= lit' nullLit') $ aliases
-                Nothing      -> stop state "getReferences: no aliases"
+                Nothing      -> stop state (noAliasesErrorMessage "getReferences")
         _ ->
-            stop state "getReferences: non-reference"
+            stop state (expectedReferenceErrorMessage "getReferences" ref)

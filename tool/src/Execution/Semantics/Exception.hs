@@ -4,6 +4,7 @@ import qualified Data.Stack as T
 import           Analysis.CFA.CFG
 import           Control.Lens ((&), (^.), (%~))
 import           Execution.Effects
+import           Execution.Errors
 import           Execution.State
 import           Execution.State.Thread
 
@@ -14,7 +15,7 @@ insertHandler state handler
         let thread1 = thread0 & (handlerStack %~ T.push (handler, 0))
         return $ updateThreadInState state thread1
     | otherwise = 
-        stop state "insertHandler: cannot get current thread"
+        stop state (cannotGetCurrentThreadErrorMessage "insertHandler")
     
 findLastHandler :: ExecutionState -> Maybe (Node, Int)
 findLastHandler state = do
@@ -27,14 +28,14 @@ removeLastHandler state
         let thread1 = thread0 & (handlerStack %~ T.pop)
         return $ updateThreadInState state thread1
     | otherwise = 
-        stop state "removeLastHandler: cannot get current thread"
+        stop state (cannotGetCurrentThreadErrorMessage "removeLastHandler")
 
 incrementLastHandlerPopsOnCurrentThread :: ExecutionState -> Engine r ExecutionState
 incrementLastHandlerPopsOnCurrentThread state
     | Just tid <- state ^. currentThreadId = 
         incrementLastHandlerPops state tid
     | otherwise = 
-        stop state "pushStackFrameOnCurrentThread: cannot get current thread"
+        stop state (cannotGetCurrentThreadErrorMessage "incrementLastHandlerPopsOnCurrentThread")
 
 incrementLastHandlerPops :: ExecutionState -> ThreadId -> Engine r ExecutionState
 incrementLastHandlerPops state tid
@@ -49,7 +50,7 @@ incrementLastHandlerPops state tid
 decrementLastHandlerPops :: ExecutionState -> Engine r ExecutionState
 decrementLastHandlerPops state
     | Nothing <- thread0 =
-        stop state "decrementLastHandlerPops: cannot get current thread"
+        stop state (cannotGetCurrentThreadErrorMessage "decrementLastHandlerPops")
     | Just thread1         <- thread0
     , Just (handler, pops) <- T.peek (thread1 ^. handlerStack) = do
         debug ("Decrementing exception handler stack pop to '" ++ show (pops - 1) ++ "'")

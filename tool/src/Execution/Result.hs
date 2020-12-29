@@ -2,6 +2,7 @@ module Execution.Result where
 
 import Prelude hiding ((<>))
 import Text.Pretty
+import Data.Error
 import Data.Positioned
 import Analysis.CFA.CFG
 
@@ -10,7 +11,7 @@ data VerificationResult
     | Invalid Position [CFGContext]
     | Unknown Position [CFGContext]
     | Deadlock [CFGContext]
-    | InternalError String
+    | InternalError ErrorMessage
 
 isValid, isInvalid, isUnknown, isDeadlock, isInternalError :: VerificationResult -> Bool
 isValid         result = case result of Valid{}         -> True; _ -> False  

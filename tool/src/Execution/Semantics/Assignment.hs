@@ -13,6 +13,7 @@ import           Execution.State
 import           Execution.State.Heap
 import           Execution.State.AliasMap as AliasMap
 import           Execution.Effects
+import           Execution.Errors
 import           Execution.Semantics.Evaluation
 import           Execution.Semantics.Heap
 import           Execution.Semantics.StackFrame
@@ -37,7 +38,7 @@ execLhs state0 lhs@LhsField{} value = do
             state2 <- removeSymbolicNull state1 ref
             writeSymbolicField state2 ref field value
         _ -> 
-            stop state0 "execLhs: expected a reference"
+            stop state0 (expectedReferenceErrorMessage "execLhs" ref)
             
 execLhs state0 lhs@LhsElem{} value = do
     ref <- readDeclaration state0 (lhs ^?! SL.var)
@@ -54,10 +55,10 @@ execLhs state0 lhs@LhsElem{} value = do
             concretize concretizations state1 $ \ state2 ->
                 case AliasMap.lookup symRef (state2 ^. aliasMap) of
                     Nothing   -> 
-                        stop state2 "execLhs: No concrete references"
+                        stop state2 (noAliasesErrorMessage "execLhs")
                     Just refs ->
                         if length refs /= 1
-                            then stop state2 "execLhs: Non concretized symbolic reference"
+                            then stop state2 (exactlyOneAliasErrorMessage "execLhs" (length refs))
                             else do
                                 (state3, index) <- evaluateAsInt state2 (lhs ^?! SL.index)
                                 let (Ref ref _ _) = S.elemAt 0 refs
@@ -65,7 +66,7 @@ execLhs state0 lhs@LhsElem{} value = do
                                     Right index -> writeConcreteElem state3 ref index value
                                     Left index  -> writeSymbolicElem state3 ref index value
         _                      ->
-            stop state0 "execLhs: expected a reference"
+            stop state0 (expectedReferenceErrorMessage "execLhs" ref)
 
 execRhs :: ExecutionState -> Rhs -> Engine r (ExecutionState, Expression)
 execRhs state0 rhs@RhsExpression{} = do
@@ -92,7 +93,7 @@ execRhs state0 rhs@RhsField{} = do
         Conditional{} -> 
             execRhsFieldConditional state0 ref field
         _ -> 
-            stop state0 "execRhs: expected a reference or conditional"
+            stop state0 (expectedReferenceErrorMessage "execRhs" ref)
         where
             execRhsFieldConditional :: ExecutionState -> Expression -> Identifier -> Engine r (ExecutionState, Expression)
             execRhsFieldConditional state0 (Conditional guard true0 false0 ty info) field = do
@@ -107,8 +108,8 @@ execRhs state0 rhs@RhsField{} = do
                 state1 <- initializeSymbolicRef state0 ref
                 state2 <- removeSymbolicNull state1 ref
                 (state1,) <$> readSymbolicField state2 ref field
-            execRhsFieldConditional _ _ _ =
-                stop state0 "execRhsFieldConditional: expected a reference or conditional"
+            execRhsFieldConditional state0 ref _ =
+                stop state0 (expectedReferenceErrorMessage "execRhsFieldConditional" ref)
   
 execRhs state0 rhs@RhsElem{} = do
     let var = rhs ^?! SL.var ^?! SL.var
@@ -119,10 +120,10 @@ execRhs state0 rhs@RhsElem{} = do
         SymbolicRef ref _ _ -> 
             case AliasMap.lookup ref (state0 ^. aliasMap) of
                 Nothing      -> 
-                    stop state0 "execRhs: no aliases"
+                    stop state0 (noAliasesErrorMessage "execRhs")
                 Just aliases -> 
                     if S.size aliases /= 1
-                        then stop state0 "execRhs: Symbolic Reference"
+                        then stop state0 (exactlyOneAliasErrorMessage "execRhs" (S.size aliases))
                         else do
                             let alias = S.elemAt 0 aliases
                             debug ("Overwritting '" ++ toString var ++ "' with single alias '" ++ toString alias ++ "'")
@@ -133,14 +134,14 @@ execRhs state0 rhs@RhsElem{} = do
             value <- either (readSymbolicElem state1 ref) (readConcreteElem state1 ref) index
             return (state1, value)
         _                   ->
-            stop state0 "execRhs: expected a reference"
+            stop state0 (expectedReferenceErrorMessage "execRhs" ref)
 
 execRhs state0 rhs@RhsArray{} = do 
     (state1, sizes) <- mapAccumM evaluateAsInt state0 (rhs ^?! SL.sizes)
     execNewArray state1 sizes (typeOf rhs)
 
 execRhs state RhsCall{} =
-    stop state "execRhs: evaluating a method call"
+    stop state (expectedNoMethodCallErrorMessage "execRhs")
 
 execNewArray :: ExecutionState -> [EvaluationResult Int] -> RuntimeType -> Engine r (ExecutionState, Expression)
 execNewArray state [Right size] ty = do
@@ -159,5 +160,5 @@ execNewArray state0 (Right size:sizes) ty = do
             (state2, ref) <- execNewArray state1 sizes elemTy
             return (state2, ref : refs)
 
-execNewArray state _ _ =
-    stop state "execNewArray: symbolic size"
+execNewArray state (Left size:_) _ =
+    stop state (expectedConcreteValueErrorMessge "execNewArray" size)

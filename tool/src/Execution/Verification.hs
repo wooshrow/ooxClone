@@ -13,6 +13,7 @@ import           Data.Positioned
 import           Data.Configuration
 import           Data.Statistics
 import           Execution.Effects
+import           Execution.Errors
 import           Execution.Semantics.Evaluation
 import           Execution.State
 import           Execution.State.AliasMap as AliasMap
@@ -71,9 +72,9 @@ substituteSymbolicRef state ref _ _
     | Just aliases <- AliasMap.lookup ref (state ^. aliasMap) =
         case S.size aliases of
             1 -> return $ S.elemAt 0 aliases
-            n -> stop state ("substitute: '" ++ toString n ++ "'' aliases for '" ++ toString ref ++ "'")
+            n -> stop state (exactlyOneAliasErrorMessage "substituteSymbolicRef" n)
     | otherwise =
-        stop state ("substitute: no aliases for '" ++ toString ref ++ "'")
+        stop state (noAliasesErrorMessage "substituteSymbolicRef")
 
 --------------------------------------------------------------------------------
 -- Verification Engine

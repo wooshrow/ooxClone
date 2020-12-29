@@ -28,6 +28,7 @@ import Control.Applicative
 import Control.Lens ((^.), Field1(_1), Field2(_2), Field3(_3))
 import Logger
 import Execution.State
+import Data.Error
 import Data.Configuration
 import Data.Positioned
 import Text.Pretty (toDebugString)
@@ -50,7 +51,7 @@ infeasible :: Engine r a
 infeasible = measurePrune >> empty
 
 -- | Terminate with an internal error.
-stop :: ExecutionState -> String -> Engine r a
+stop :: ExecutionState -> ErrorMessage -> Engine r a
 stop state message = do
     debug ("Stopping with state: \n" ++ toDebugString state)
     throw $ InternalError message
