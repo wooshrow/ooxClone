@@ -156,10 +156,10 @@ evaluate' state0 expression = foldExpression algebra expression state0
                 case ref of
                     Lit NullLit {} _ _ -> 
                         infeasible
-                    Ref ref _ _        -> do
+                    Ref ref _ _ -> do
                         size <- fmap (lit' . intLit') (sizeof state1 ref)
                         return (state1, size)
-                    SymbolicRef ref _ _ ->
+                    SymbolicRef{} ->
                         stop state1 "evaluate: SizeOf of symbolic reference"
                     _ -> 
                         stop state1 "evaluate: SizeOf of non-reference"
@@ -188,9 +188,9 @@ evaluateQuantifier quantifier element range domain formula _ _ state0 = do
     case ref of
         Lit NullLit{} _ _ -> 
             infeasible
-        SymbolicRef{}     -> 
+        SymbolicRef{} -> 
             stop state0 "evaluateQuantifier: symbolic reference"
-        Ref ref _ _       ->
+        Ref ref _ _ ->
             case dereference state0 ref of
                 Just (ArrayValue values) -> do
                     let options = (zip values . map (lit' . intLit')) [0..]
@@ -200,8 +200,12 @@ evaluateQuantifier quantifier element range domain formula _ _ state0 = do
                         formula state2
                     -- TODO: the alias map needs to be extracted from formulas and passed on
                     evaluate state0 (quantifier (map snd formulas))
+                Just ObjectValue{} ->
+                    stop state0 "evaluateQuantifier: dereference of object"
                 Nothing ->
                     stop state0 ("evaluateQuantifier: dereference of uninitialized ref '" ++ toString ref ++ "'")
+        _ ->
+            stop state0 "evaluateQuantifier: non-reference"
 
 evaluateBinOp :: ExecutionState -> BinOp -> Expression -> Expression ->  RuntimeType -> Position -> Engine r Expression
 -- Boolean Evaluation

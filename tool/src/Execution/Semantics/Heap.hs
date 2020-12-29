@@ -120,53 +120,55 @@ readSymbolicField state _ _ =
 --------------------------------------------------------------------------------
 
 sizeof :: ExecutionState -> Reference -> Engine r Int
-sizeof state ref =
-    case dereference state ref of
-        Just (ArrayValue values) ->
-            return (length values)
-        Nothing ->
-            stop state ("sizeof: dereference of uninitialized ref '" ++ toString ref ++ "'")
+sizeof state ref = case dereference state ref of
+    Just (ArrayValue elements) ->
+        return (length elements)
+    Just ObjectValue{} ->
+        stop state "sizeof: derefence of object"
+    Nothing ->
+        stop state ("sizeof: dereference of uninitialized ref '" ++ toString ref ++ "'")
 
 readConcreteElem :: ExecutionState -> Reference -> Int -> Engine r Expression
-readConcreteElem state ref index = 
-    case dereference state ref of
-        Just (ArrayValue values) ->
-            if index >= 0 && index < length values
-                then return (values ^?! element index)
-                else infeasible
-        Nothing ->
-            stop state ("readConcreteElem: dereference of uninitialized ref '" ++ toString ref ++ "'")
+readConcreteElem state ref index = case dereference state ref of
+    Just (ArrayValue values) 
+        | index >= 0 && index < length values -> return (values ^?! element index)
+        | otherwise -> infeasible
+    Just ObjectValue{} ->
+        stop state "readConcreteElem: dereference of object"
+    Nothing ->
+        stop state ("readConcreteElem: dereference of uninitialized ref '" ++ toString ref ++ "'")
 
 readSymbolicElem :: ExecutionState -> Reference -> Expression -> Engine r Expression
-readSymbolicElem state ref index =
-    case dereference state ref of
-        Just (ArrayValue values) -> do
-            let indices = map (lit' . intLit') [1..]
-            let value = foldr (\ (value, concIndex) -> conditional' (index `equal'` concIndex) value) (values ^?! _head) (zip (values ^?! _tail) indices)
-            return value
-        Nothing ->
-            stop state ("readSymbolicElem: dereference of uninitialized ref '" ++ toString ref ++ "'")
+readSymbolicElem state ref index = case dereference state ref of
+    Just (ArrayValue values) -> do
+        let indices = map (lit' . intLit') [1..]
+        let value = foldr (\ (value, concIndex) -> conditional' (index `equal'` concIndex) value) (values ^?! _head) (zip (values ^?! _tail) indices)
+        return value
+    Just ObjectValue{} ->
+        stop state "readSymbolicElem: dereference of object"
+    Nothing ->
+        stop state ("readSymbolicElem: dereference of uninitialized ref '" ++ toString ref ++ "'")
 
 writeConcreteElem :: ExecutionState -> Reference -> Int -> Expression -> Engine r ExecutionState
-writeConcreteElem state ref index value =
-    case dereference state ref of
-        Just (ArrayValue values) ->
-            if index >= 0 && index < length values
-                then do
-                    let newStructure = ArrayValue (values & (element index .~ value))            
-                    return $ state & (heap %~ Heap.insert ref newStructure)
-                else 
-                    infeasible
-        Nothing ->             
-            stop state ("writeConcreteElem: dereference of uninitialized ref '" ++ toString ref ++ "'")
+writeConcreteElem state ref index value = case dereference state ref of
+    Just (ArrayValue values)
+        | index >= 0 && index < length values -> do
+            let newStructure = ArrayValue (values & (element index .~ value))            
+            return $ state & (heap %~ Heap.insert ref newStructure)
+        | otherwise -> 
+            infeasible
+    Just ObjectValue{} ->
+        stop state "writeConcreteElem: dereference of object"
+    Nothing ->             
+        stop state ("writeConcreteElem: dereference of uninitialized ref '" ++ toString ref ++ "'")
 
 writeSymbolicElem :: ExecutionState -> Reference -> Expression -> Expression -> Engine r ExecutionState
-writeSymbolicElem state ref index value =
-    case dereference state ref of
-        Just (ArrayValue values) -> do
-            let newStructure = ArrayValue $ zipWith (\ oldValue concIndex -> conditional' (index `equal'` concIndex) value oldValue) values indices
-            return $ state & (heap %~ Heap.insert ref newStructure)
-        Nothing ->
-            stop state ("writeSymbolicElem: dereference of uninitialized ref '" ++ toString ref ++ "'")
-    where
-        indices = map (lit' . intLit') [0..]
+writeSymbolicElem state ref index value = case dereference state ref of
+    Just (ArrayValue values) -> do
+        let indices = map (lit' . intLit') [0..]
+        let newStructure = ArrayValue $ zipWith (\ oldValue concIndex -> conditional' (index `equal'` concIndex) value oldValue) values indices
+        return $ state & (heap %~ Heap.insert ref newStructure)
+    Just ObjectValue{} ->
+        stop state "writeSymbolicElem: dereference of object"
+    Nothing ->
+        stop state ("writeSymbolicElem: dereference of uninitialized ref '" ++ toString ref ++ "'")
