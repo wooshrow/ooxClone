@@ -8,6 +8,7 @@ module Execution.Semantics.Evaluation(
 ) where
 
 import Control.Monad
+import Control.Lens ((^?!))
 import Text.Pretty
 import Data.Configuration
 import Data.Statistics
@@ -21,14 +22,13 @@ import Execution.Effects
 import Execution.Errors
 import Execution.State
 import Execution.State.Heap
+import Execution.State.Evaluation
 import Execution.Result
 import Data.Positioned
 import Language.Syntax
 import Language.Syntax.Fold
+import qualified Language.Syntax.Lenses as SL
 import Language.Syntax.DSL
-
--- | An Evaluation Result is either a (simplified) expression or the result type.
-type EvaluationResult a = Either Expression a
 
 evaluateAsInt :: ExecutionState -> Expression -> Engine r (ExecutionState, EvaluationResult Int)
 evaluateAsInt state0 expression = do
@@ -97,8 +97,8 @@ substitute state0 expression = foldExpression algebra expression state0
                 case ref of 
                     Lit NullLit{} _ _ -> 
                         infeasible
-                    Ref ref _ _       -> do
-                        size <- fmap (lit' . intLit') (sizeof state1 ref)
+                    Ref{} -> do
+                        size <- fmap (lit' . intLit') (sizeof state1 (ref ^?! SL.ref))
                         return (state1, size)
                     _ -> 
                         stop state1 (expectedConcreteReferenceErrorMessage "substitute" ref)
@@ -158,8 +158,8 @@ evaluate' state0 expression = foldExpression algebra expression state0
                 case ref of
                     Lit NullLit {} _ _ -> 
                         infeasible
-                    Ref ref _ _ -> do
-                        size <- fmap (lit' . intLit') (sizeof state1 ref)
+                    Ref{} -> do
+                        size <- fmap (lit' . intLit') (sizeof state1 (ref ^?! SL.ref))
                         return (state1, size)
                     _ -> 
                         stop state1 (expectedConcreteReferenceErrorMessage "evaluate'" ref)
@@ -188,8 +188,8 @@ evaluateQuantifier quantifier element range domain formula _ _ state0 = do
     case ref of
         Lit NullLit{} _ _ -> 
             infeasible
-        Ref ref _ _ ->
-            case dereference state0 ref of
+        Ref{} ->
+            case dereference state0 (ref ^?! SL.ref) of
                 Just (ArrayValue values) -> do
                     let options = (zip values . map (lit' . intLit')) [0..]
                     formulas <- forM options $ \ (value, index) -> do
@@ -201,7 +201,7 @@ evaluateQuantifier quantifier element range domain formula _ _ state0 = do
                 Just ObjectValue{} ->
                     stop state0 (expectedArrayErrorMessage "evaluateQuantifier")
                 Nothing ->
-                    stop state0 (uninitializedReferenceErrorMessage "evaluateQuantifier" ref)
+                    stop state0 (uninitializedReferenceErrorMessage "evaluateQuantifier" (ref ^?! SL.ref))
         _ ->
             stop state0 (expectedConcreteReferenceErrorMessage "evaluateQuantifier" ref)
 

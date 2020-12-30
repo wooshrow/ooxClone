@@ -8,7 +8,6 @@ import           Polysemy
 import           Z3.Monad hiding (substitute)
 import           Control.Monad (void)
 import           Control.Lens
-import           Text.Pretty
 import           Data.Positioned
 import           Data.Configuration
 import           Data.Statistics

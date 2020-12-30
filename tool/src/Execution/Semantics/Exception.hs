@@ -6,14 +6,13 @@ import           Control.Lens ((&), (^.), (%~))
 import           Execution.Effects
 import           Execution.Errors
 import           Execution.State
-import           Execution.State.Thread
+import           Execution.State.Thread (ThreadId, handlerStack)
 
 insertHandler :: ExecutionState -> Node -> Engine r ExecutionState
 insertHandler state handler 
-    | Just thread0 <- getCurrentThread state = do
+    | Just thread <- getCurrentThread state = do
         debug ("Inserting an exception handler '" ++ show handler ++ "'")
-        let thread1 = thread0 & (handlerStack %~ T.push (handler, 0))
-        return $ updateThreadInState state thread1
+        return $ updateThreadInState state (thread & (handlerStack %~ T.push (handler, 0)))
     | otherwise = 
         stop state (cannotGetCurrentThreadErrorMessage "insertHandler")
     
@@ -24,9 +23,8 @@ findLastHandler state = do
 
 removeLastHandler :: ExecutionState -> Engine r ExecutionState
 removeLastHandler state
-    | Just thread0 <- getCurrentThread state = do
-        let thread1 = thread0 & (handlerStack %~ T.pop)
-        return $ updateThreadInState state thread1
+    | Just thread <- getCurrentThread state = do
+        return $ updateThreadInState state (thread & (handlerStack %~ T.pop))
     | otherwise = 
         stop state (cannotGetCurrentThreadErrorMessage "removeLastHandler")
 
@@ -39,23 +37,21 @@ incrementLastHandlerPopsOnCurrentThread state
 
 incrementLastHandlerPops :: ExecutionState -> ThreadId -> Engine r ExecutionState
 incrementLastHandlerPops state tid
-    | Just thread1         <- getThread state tid
-    , Just (handler, pops) <- T.peek (thread1 ^. handlerStack) = do
+    | Just thread          <- getThread state tid
+    , Just (handler, pops) <- T.peek (thread ^. handlerStack) = do
         debug ("Incrementing exception handler stack pop to '" ++ show (pops + 1) ++ "'")
-        let thread2 = thread1 & (handlerStack %~ T.updateTop (handler, pops + 1))
-        return $ updateThreadInState state thread2
+        return $ updateThreadInState state (thread & (handlerStack %~ T.updateTop (handler, pops + 1)))
     | otherwise = 
         return state
 
 decrementLastHandlerPops :: ExecutionState -> Engine r ExecutionState
 decrementLastHandlerPops state
-    | Nothing <- thread0 =
+    | Nothing <- currentThread =
         stop state (cannotGetCurrentThreadErrorMessage "decrementLastHandlerPops")
-    | Just thread1         <- thread0
-    , Just (handler, pops) <- T.peek (thread1 ^. handlerStack) = do
+    | Just thread          <- currentThread
+    , Just (handler, pops) <- T.peek (thread ^. handlerStack) = do
         debug ("Decrementing exception handler stack pop to '" ++ show (pops - 1) ++ "'")
-        let thread2 = thread1 & (handlerStack %~ T.updateTop (handler, pops - 1))
-        return $ updateThreadInState state thread2
+        return $ updateThreadInState state (thread & (handlerStack %~ T.updateTop (handler, pops - 1)))
     | otherwise =
         return state
-    where thread0 = getCurrentThread state
+    where currentThread = getCurrentThread state

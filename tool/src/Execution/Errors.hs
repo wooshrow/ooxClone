@@ -3,7 +3,7 @@ module Execution.Errors where
 import Data.Error
 import Text.Pretty (toString)
 import Language.Syntax
-import Execution.State.Thread
+import Execution.State.Thread (ThreadId)
 
 cannotGetCurrentThreadErrorMessage :: String -> ErrorMessage
 cannotGetCurrentThreadErrorMessage caller = otherError $ withCallerName caller

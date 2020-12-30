@@ -1,5 +1,5 @@
 module Logger(
-      module Polysemy.Trace
+      Trace
     , inform
     , debug
 ) where

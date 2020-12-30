@@ -47,6 +47,7 @@ executable app
                           , Execution.State.AliasMap
                           , Execution.State.Heap
                           , Execution.State.InterleavingConstraints
+                          , Execution.State.Evaluation
                           , Execution.Result
                           , Execution.Verification
                           , Data.Positioned

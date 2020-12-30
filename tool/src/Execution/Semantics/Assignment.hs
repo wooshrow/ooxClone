@@ -4,7 +4,7 @@ module Execution.Semantics.Assignment(
 ) where
 
 import qualified Data.Set as S
-import           Control.Monad
+import           Control.Monad (foldM)
 import           Control.Monad.Extra
 import           Control.Lens ((^?!), (^.))
 import           Text.Pretty
@@ -31,8 +31,8 @@ execLhs state0 lhs@LhsField{} value = do
     case ref of
         Lit NullLit{} _ _ -> 
             infeasible
-        Ref ref _ _ -> 
-            writeConcreteField state0 ref field value
+        Ref{} -> 
+            writeConcreteField state0 (ref ^?! SL.ref) field value
         SymbolicRef{} -> do
             state1 <- initializeSymbolicRef state0 ref
             state2 <- removeSymbolicNull state1 ref
@@ -45,27 +45,23 @@ execLhs state0 lhs@LhsElem{} value = do
     case ref of
         Lit NullLit{} _ _ -> 
             infeasible
-        Ref ref _ _       -> do
+        Ref{} -> do
             (state1, index) <- evaluateAsInt state0 (lhs ^?! SL.index)
-            case index of
-                Right index -> writeConcreteElem state1 ref index value
-                Left index  -> writeSymbolicElem state1 ref index value
+            writeElem state1 (ref ^?! SL.ref) index value
         SymbolicRef symRef _ _ -> do
             (state1, concretizations) <- concretesOfType state0 ARRAYRuntimeType ref
             concretize concretizations state1 $ \ state2 ->
                 case AliasMap.lookup symRef (state2 ^. aliasMap) of
-                    Nothing   -> 
+                    Just refs 
+                        | length refs == 1 -> do
+                            (state3, index) <- evaluateAsInt state2 (lhs ^?! SL.index)
+                            let (Ref ref _ _) = S.elemAt 0 refs
+                            writeElem state3 ref index value
+                        | otherwise ->
+                            stop state2 (exactlyOneAliasErrorMessage "execLhs" (length refs))
+                    Nothing -> 
                         stop state2 (noAliasesErrorMessage "execLhs")
-                    Just refs ->
-                        if length refs /= 1
-                            then stop state2 (exactlyOneAliasErrorMessage "execLhs" (length refs))
-                            else do
-                                (state3, index) <- evaluateAsInt state2 (lhs ^?! SL.index)
-                                let (Ref ref _ _) = S.elemAt 0 refs
-                                case index of
-                                    Right index -> writeConcreteElem state3 ref index value
-                                    Left index  -> writeSymbolicElem state3 ref index value
-        _                      ->
+        _ ->
             stop state0 (expectedReferenceErrorMessage "execLhs" ref)
 
 execRhs :: ExecutionState -> Rhs -> Engine r (ExecutionState, Expression)
@@ -76,64 +72,33 @@ execRhs state0 rhs@RhsExpression{} = do
         debug ("Evaluated rhs '" ++ toString rhs ++ "' to '" ++ toString value ++ "'")
         return (state3, value)
 
-execRhs state0 rhs@RhsField{} = do
-    let field = rhs ^?! SL.field
-    ref <- readDeclaration state0 (rhs ^?! SL.var ^?! SL.var)
-    case ref of
-        Lit NullLit{} _ _ -> 
-            infeasible
-        Ref ref _ _ -> do
-            value <- readConcreteField state0 ref field
-            return (state0, value)
-        SymbolicRef{} -> do
-            state1 <- initializeSymbolicRef state0 ref
-            state2 <- removeSymbolicNull state1 ref
-            value  <- readSymbolicField state2 ref field
-            return (state1, value)
-        Conditional{} -> 
-            execRhsFieldConditional state0 ref field
-        _ -> 
-            stop state0 (expectedReferenceErrorMessage "execRhs" ref)
-        where
-            execRhsFieldConditional :: ExecutionState -> Expression -> Identifier -> Engine r (ExecutionState, Expression)
-            execRhsFieldConditional state0 (Conditional guard true0 false0 ty info) field = do
-                (state1, true1)  <- execRhsFieldConditional state0 true0 field
-                (state2, false1) <- execRhsFieldConditional state1 false0 field
-                return (state2, Conditional guard true1 false1 ty info)
-            execRhsFieldConditional _ (Lit NullLit{} _ _) _ = 
-                infeasible
-            execRhsFieldConditional state0 (Ref ref _ _) field = 
-                (state0,) <$> readConcreteField state0 ref field
-            execRhsFieldConditional state0 ref@SymbolicRef{} field = do
-                state1 <- initializeSymbolicRef state0 ref
-                state2 <- removeSymbolicNull state1 ref
-                (state1,) <$> readSymbolicField state2 ref field
-            execRhsFieldConditional state0 ref _ =
-                stop state0 (expectedReferenceErrorMessage "execRhsFieldConditional" ref)
+execRhs state rhs@RhsField{} = do
+    ref <- readDeclaration state (rhs ^?! SL.var ^?! SL.var)
+    execRhsField state ref (rhs ^?! SL.field)
   
 execRhs state0 rhs@RhsElem{} = do
     let var = rhs ^?! SL.var ^?! SL.var
     ref <- readDeclaration state0 var
     case ref of
-        Lit NullLit{} _ _   -> 
+        Lit NullLit{} _ _ -> 
             infeasible
         SymbolicRef ref _ _ -> 
             case AliasMap.lookup ref (state0 ^. aliasMap) of
-                Nothing      -> 
+                Just aliases
+                    | length aliases == 1 -> do
+                        let alias = S.elemAt 0 aliases
+                        debug ("Overwritting '" ++ toString var ++ "' with single alias '" ++ toString alias ++ "'")
+                        state1 <- writeDeclaration state0 var alias
+                        execRhs state1 rhs
+                    | otherwise -> 
+                        stop state0 (exactlyOneAliasErrorMessage "execRhs" (S.size aliases))
+                Nothing -> 
                     stop state0 (noAliasesErrorMessage "execRhs")
-                Just aliases -> 
-                    if S.size aliases /= 1
-                        then stop state0 (exactlyOneAliasErrorMessage "execRhs" (S.size aliases))
-                        else do
-                            let alias = S.elemAt 0 aliases
-                            debug ("Overwritting '" ++ toString var ++ "' with single alias '" ++ toString alias ++ "'")
-                            state1 <- writeDeclaration state0 var alias
-                            execRhs state1 rhs
-        Ref ref _ _         -> do
+        Ref{} -> do
             (state1, index) <- evaluateAsInt state0 (rhs ^?! SL.index)
-            value <- either (readSymbolicElem state1 ref) (readConcreteElem state1 ref) index
+            value <- readElem state1 (ref ^?! SL.ref) index
             return (state1, value)
-        _                   ->
+        _ ->
             stop state0 (expectedReferenceErrorMessage "execRhs" ref)
 
 execRhs state0 rhs@RhsArray{} = do 
@@ -142,6 +107,26 @@ execRhs state0 rhs@RhsArray{} = do
 
 execRhs state RhsCall{} =
     stop state (expectedNoMethodCallErrorMessage "execRhs")
+
+execRhsField :: ExecutionState -> Expression -> Identifier -> Engine r (ExecutionState, Expression)
+execRhsField state0 (Conditional guard true0 false0 ty info) field =  do
+    (state1, true1)  <- execRhsField state0 true0 field
+    (state2, false1) <- execRhsField state1 false0 field
+    return (state2, Conditional guard true1 false1 ty info)
+
+execRhsField _ (Lit NullLit{} _ _) _ = 
+    infeasible
+
+execRhsField state (Ref ref _ _) field = 
+    (state,) <$> readConcreteField state ref field
+
+execRhsField state0 ref@SymbolicRef{} field = do
+    state1 <- initializeSymbolicRef state0 ref
+    state2 <- removeSymbolicNull state1 ref
+    (state1,) <$> readSymbolicField state2 ref field
+
+execRhsField state ref _ =
+    stop state (expectedReferenceErrorMessage "execRhsField" ref)
 
 execNewArray :: ExecutionState -> [EvaluationResult Int] -> RuntimeType -> Engine r (ExecutionState, Expression)
 execNewArray state [Right size] ty = do

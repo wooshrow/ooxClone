@@ -6,7 +6,6 @@ module Execution.Semantics.PartialOrderReduction(
 import qualified Data.Set as S
 import           Control.Lens ((&), (^?!), (^.), (.~), (?~))
 import           Control.Monad
-import           Text.Pretty
 import           Data.Configuration
 import           Data.Statistics
 import           Execution.Effects

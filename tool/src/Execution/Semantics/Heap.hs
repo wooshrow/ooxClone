@@ -6,8 +6,10 @@ module Execution.Semantics.Heap(
     , readConcreteField
     , readSymbolicField
     , sizeof
+    , readElem
     , readConcreteElem
     , readSymbolicElem
+    , writeElem
     , writeConcreteElem
     , writeSymbolicElem
 ) where
@@ -25,6 +27,7 @@ import           Execution.Errors
 import           Execution.State
 import           Execution.State.Heap as Heap
 import           Execution.State.AliasMap as AliasMap
+import           Execution.State.Evaluation
 import           Language.Syntax
 import           Language.Syntax.DSL
 import qualified Language.Syntax.Lenses as SL
@@ -50,7 +53,7 @@ writeConcreteField state ref field value =
             debug ("Assigning '" ++ toString value ++ "' to '" ++ toString ref ++ "." ++ toString field ++ "'")
             let newStructure = ObjectValue (M.insert field value values) ty
             return $ state & (heap %~ Heap.insert ref newStructure)
-        Just (ArrayValue values) ->
+        Just ArrayValue{} ->
              stop state (expectedObjectErrorMessage "writeConcreteField")
         Nothing ->
             stop state (uninitializedReferenceErrorMessage "writeConcreteField" ref)
@@ -97,7 +100,7 @@ readConcreteField state ref field =
                     return value
                 Nothing -> 
                     stop state (readOfUndeclaredFieldErrorMessge "readConcreteField" field)
-        Just (ArrayValue values) ->
+        Just ArrayValue{} ->
              stop state (expectedObjectErrorMessage "readConcreteField")
         Nothing ->
             stop state (uninitializedReferenceErrorMessage "readConcreteField" ref)
@@ -129,6 +132,9 @@ sizeof state ref = case dereference state ref of
     Nothing ->
         stop state (uninitializedReferenceErrorMessage "sizeof" ref)
 
+readElem :: ExecutionState -> Reference -> EvaluationResult Int -> Engine r Expression
+readElem state ref = either (readSymbolicElem state ref) (readConcreteElem state ref)
+
 readConcreteElem :: ExecutionState -> Reference -> Int -> Engine r Expression
 readConcreteElem state ref index = case dereference state ref of
     Just (ArrayValue values) 
@@ -149,6 +155,9 @@ readSymbolicElem state ref index = case dereference state ref of
         stop state (expectedArrayErrorMessage "readSymbolicElem")
     Nothing ->
         stop state (uninitializedReferenceErrorMessage "readSymbolicElem" ref)
+
+writeElem :: ExecutionState -> Reference -> EvaluationResult Int -> Expression -> Engine r ExecutionState
+writeElem state ref = either (writeSymbolicElem state ref) (writeConcreteElem state ref)
 
 writeConcreteElem :: ExecutionState -> Reference -> Int -> Expression -> Engine r ExecutionState
 writeConcreteElem state ref index value = case dereference state ref of

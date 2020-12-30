@@ -201,7 +201,7 @@ execMemberExit state0 returnTy = do
         else
             case getCurrentThread state1 of
                 Nothing ->
-                        stop state1 (cannotGetCurrentThreadErrorMessage "execMemberExit")
+                    stop state1 (cannotGetCurrentThreadErrorMessage "execMemberExit")
                 Just thread1 -> do
                     let oldFrame  = fromJust (getLastStackFrame thread1)
                     let neighbour = Just ((), oldFrame ^. returnPoint)
@@ -274,23 +274,26 @@ execLock state0 var = do
             (state1, concretizations) <- concretesOfType state0 ARRAYRuntimeType ref
             concretize concretizations state1 $ \ state2 ->
                 execLock state2 var
-        Ref ref _ _       ->
+        Ref ref _ _ ->
             case state0 ^. currentThreadId of
-                Nothing         -> 
-                    stop state0 (cannotGetCurrentThreadErrorMessage "execLock")
                 Just currentTid -> 
                     case LockSet.lookup ref (state0 ^. locks) of
-                        Just tid -> if tid == currentTid then return state0 else infeasible
-                        Nothing  -> return $ state0 & (locks %~ LockSet.insert ref currentTid)
-        _                 -> 
+                        Just tid 
+                            | tid == currentTid -> return state0
+                            | otherwise -> infeasible
+                        Nothing -> 
+                            return $ state0 & (locks %~ LockSet.insert ref currentTid)
+                Nothing -> 
+                    stop state0 (cannotGetCurrentThreadErrorMessage "execLock")
+        _ -> 
             stop state0 (expectedReferenceErrorMessage "execLock" ref)
 
 execUnlock :: ExecutionState -> Identifier -> Engine r ExecutionState
 execUnlock state var = do
     ref <- readDeclaration state var
     case ref of
-        Ref ref _ _ -> 
-            return $ state & (locks %~ LockSet.remove ref)
+        Ref{} -> 
+            return $ state & (locks %~ LockSet.remove (ref ^?! SL.ref))
         _ -> 
             stop state (expectedConcreteReferenceErrorMessage "execUnock" ref)
 
