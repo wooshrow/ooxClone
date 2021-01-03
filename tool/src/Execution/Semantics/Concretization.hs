@@ -11,6 +11,7 @@ module Execution.Semantics.Concretization(
     , removeSymbolicNull
 ) where
 
+import qualified GHC.Stack as GHC
 import qualified Data.Map as M
 import qualified Data.Set as S
 import           Data.Foldable (fold)
@@ -43,26 +44,26 @@ import           Execution.Semantics.StackFrame
 
 type Concretization = M.Map Identifier Expression
 
-concretizeWithResult :: [Concretization] -> ExecutionState -> (ExecutionState -> Engine r (ExecutionState, a)) -> Engine r (ExecutionState, a)
+concretizeWithResult :: GHC.HasCallStack => [Concretization] -> ExecutionState -> (ExecutionState -> Engine r (ExecutionState, a)) -> Engine r (ExecutionState, a)
 concretizeWithResult [] state f = f state
 concretizeWithResult cs state f = do
     measureBranches cs
     foldr (\ x a -> f (concretize' state x) <|> a) empty cs
 
-concretize :: [Concretization] -> ExecutionState -> (ExecutionState -> Engine r ExecutionState) -> Engine r ExecutionState
+concretize :: GHC.HasCallStack => [Concretization] -> ExecutionState -> (ExecutionState -> Engine r ExecutionState) -> Engine r ExecutionState
 concretize [] state f = f state
 concretize cs state f = do
     measureBranches cs
     foldr (\ x a -> f (concretize' state x) <|> a) empty cs
 
-concretizeMap :: [Concretization] -> ExecutionState -> (ExecutionState -> Engine r ExecutionState) -> Engine r [ExecutionState]
+concretizeMap :: GHC.HasCallStack => [Concretization] -> ExecutionState -> (ExecutionState -> Engine r ExecutionState) -> Engine r [ExecutionState]
 concretizeMap [] state f = (:[]) <$> f state
 concretizeMap cs state f = mapM (f . concretize' state) cs
 
-concretize' :: ExecutionState -> Concretization -> ExecutionState
+concretize' :: GHC.HasCallStack => ExecutionState -> Concretization -> ExecutionState
 concretize' state = foldr (\ (symRef, concRef) stateN -> stateN & (aliasMap %~ AliasMap.insert symRef (S.singleton concRef))) state . M.toList
 
-concretesOfTypes :: ExecutionState -> RuntimeType -> [Expression] -> Engine r (ExecutionState, [Concretization])
+concretesOfTypes :: GHC.HasCallStack => ExecutionState -> RuntimeType -> [Expression] -> Engine r (ExecutionState, [Concretization])
 concretesOfTypes state0 ty formulas
     | Just _ <- getCurrentThread state0 = do
         refs   <- fold <$> mapM (findSymbolicRefsOfType state0 ty) formulas
@@ -70,12 +71,12 @@ concretesOfTypes state0 ty formulas
         let mappings = map (\ ref -> map (ref ^?! SL.var, ) (S.toList (fromMaybe (error "concretesOfType") (AliasMap.lookup (ref ^?! SL.var) (state1 ^. aliasMap))))) (S.toList refs)
         return (state1, map M.fromList (sequence mappings))
     | otherwise =
-        stop state0 (cannotGetCurrentThreadErrorMessage "concretesOfTypes")
+        stop state0 cannotGetCurrentThreadErrorMessage
 
-concretesOfTypeM :: ExecutionState -> RuntimeType -> Maybe Expression -> Engine r (ExecutionState, [Concretization])
+concretesOfTypeM :: GHC.HasCallStack => ExecutionState -> RuntimeType -> Maybe Expression -> Engine r (ExecutionState, [Concretization])
 concretesOfTypeM state ty = maybe (return (state, [])) (concretesOfType state ty)
 
-concretesOfType :: ExecutionState -> RuntimeType -> Expression -> Engine r (ExecutionState, [Concretization])
+concretesOfType :: GHC.HasCallStack => ExecutionState -> RuntimeType -> Expression -> Engine r (ExecutionState, [Concretization])
 concretesOfType state0 ty formula
     | Just _ <- getCurrentThread state0 = do
         refs   <- findSymbolicRefsOfType state0 ty formula
@@ -83,9 +84,9 @@ concretesOfType state0 ty formula
         let mappings = map (\ ref -> map (ref ^?! SL.var, ) (S.toList (fromMaybe (error "concretesOfType") (AliasMap.lookup (ref ^?! SL.var) (state1 ^. aliasMap))))) (S.toList refs)
         return (state1, map M.fromList (sequence mappings))
     | otherwise =
-        stop state0 (cannotGetCurrentThreadErrorMessage "concretesOfType")
+        stop state0 cannotGetCurrentThreadErrorMessage
 
-findSymbolicRefsOfType :: ExecutionState -> RuntimeType -> Expression -> Engine r (S.Set Expression)
+findSymbolicRefsOfType :: GHC.HasCallStack => ExecutionState -> RuntimeType -> Expression -> Engine r (S.Set Expression)
 findSymbolicRefsOfType state ty = foldExpression algebra
     where
         algebra = monoidMExpressionAlgebra
@@ -120,7 +121,7 @@ findSymbolicRefsOfType state ty = foldExpression algebra
                         then S.singleton ref
                         else S.empty
                     _ ->
-                        stop state (expectedReferenceErrorMessage "findSymbolicRefsOfType" ref)
+                        stop state (expectedReferenceErrorMessage ref)
 
             , fSymRef = \ symVar varTy varPos ->
                 return $ if varTy `isOfType` ty 
@@ -131,7 +132,7 @@ findSymbolicRefsOfType state ty = foldExpression algebra
 -- Lazy Symbolic Reference Initialization
 --------------------------------------------------------------------------------
 
-initializeSymbolicRef :: ExecutionState -> Expression -> Engine r ExecutionState
+initializeSymbolicRef :: GHC.HasCallStack => ExecutionState -> Expression -> Engine r ExecutionState
 initializeSymbolicRef state var@(SymbolicRef ref ty _)
     | AliasMap.member ref (state ^. aliasMap) = 
         return state
@@ -141,7 +142,7 @@ initializeSymbolicRef state var@(SymbolicRef ref ty _)
         initializeSymbolicObject state var
 
 initializeSymbolicRef state var =
-    stop state (expectedSymbolicReferenceErrorMessage "initializeSymbolicRef" var)
+    stop state (expectedSymbolicReferenceErrorMessage var)
 
 createSymbolicVar :: Typeable a => Identifier -> a -> Expression
 createSymbolicVar (Identifier name pos) ty
@@ -151,7 +152,7 @@ createSymbolicVar (Identifier name pos) ty
 --------------------------------------------------------------------------------
 -- Lazy Symbolic Array Initialization
 
-initializeSymbolicArrays :: ExecutionState -> Expression -> Engine r ExecutionState
+initializeSymbolicArrays :: GHC.HasCallStack => ExecutionState -> Expression -> Engine r ExecutionState
 initializeSymbolicArrays state0 var@(SymbolicRef ref ty _) = do
     config <- askConfig
     let sizes = [1..symbolicArraySize config]
@@ -163,9 +164,9 @@ initializeSymbolicArrays state0 var@(SymbolicRef ref ty _) = do
     return $ state1 & (aliasMap %~ AliasMap.insert ref cases)
 
 initializeSymbolicArrays state ref =
-    stop state (expectedSymbolicReferenceErrorMessage "initializeSymbolicArrays" ref)
+    stop state (expectedSymbolicReferenceErrorMessage ref)
 
-initializeSymbolicArray :: ExecutionState -> Expression -> Int -> Engine r (ExecutionState, Expression)
+initializeSymbolicArray :: GHC.HasCallStack => ExecutionState -> Expression -> Int -> Engine r (ExecutionState, Expression)
 initializeSymbolicArray state (SymbolicRef _ ty _) size = do
     let elemTy  = ty ^?! SL.innerTy    
     let indices = [0..size - 1]
@@ -173,9 +174,9 @@ initializeSymbolicArray state (SymbolicRef _ ty _) size = do
     allocate state structure
     
 initializeSymbolicArray state ref _ =
-    stop state (expectedSymbolicReferenceErrorMessage "initializeSymbolicArray" ref)
+    stop state (expectedSymbolicReferenceErrorMessage ref)
 
-initializeSymbolicElem :: ExecutionState -> RuntimeType -> Int -> Engine r Expression
+initializeSymbolicElem :: GHC.HasCallStack => ExecutionState -> RuntimeType -> Int -> Engine r Expression
 initializeSymbolicElem state ty index = do
     let symNameIndex = size (state ^. heap) + 1
     let symName      = Identifier (show symNameIndex ++ show index) unknownPos
@@ -184,7 +185,7 @@ initializeSymbolicElem state ty index = do
 --------------------------------------------------------------------------------
 -- Lazy Symbolic Object Initialization
 
-initializeSymbolicObject :: ExecutionState -> Expression -> Engine r ExecutionState
+initializeSymbolicObject :: GHC.HasCallStack => ExecutionState -> Expression -> Engine r ExecutionState
 initializeSymbolicObject state0 var@(SymbolicRef ref ty _) = do
     (config, _, table) <- ask
     let fields = (S.toList . S.map getMember . getAllFields (ty ^?! SL.ty)) table
@@ -198,9 +199,9 @@ initializeSymbolicObject state0 var@(SymbolicRef ref ty _) = do
     return $ state1 & (aliasMap %~ AliasMap.insert ref cases)
 
 initializeSymbolicObject state0 expression =
-    stop state0 (expectedSymbolicReferenceErrorMessage "initializeSymbolicObject" expression)
+    stop state0 (expectedSymbolicReferenceErrorMessage expression)
 
-initializeSymbolicField :: ExecutionState -> DeclarationMember -> Engine r (Identifier, Expression)
+initializeSymbolicField :: GHC.HasCallStack => ExecutionState -> DeclarationMember -> Engine r (Identifier, Expression)
 initializeSymbolicField state field = do
     let symNameIndex = size (state ^. heap) + 1
     let fieldName@(Identifier oldName pos) = field ^?! SL.name
@@ -213,7 +214,7 @@ initializeSymbolicField state field = do
 --------------------------------------------------------------------------------
 
 -- TODO: rewrite to lookup -> deleteAt to have O(log n) instead of O(n)
-removeSymbolicNull :: ExecutionState -> Expression -> Engine r ExecutionState
+removeSymbolicNull :: GHC.HasCallStack => ExecutionState -> Expression -> Engine r ExecutionState
 removeSymbolicNull state (SymbolicRef ref _ _)
     | Just aliases <- AliasMap.lookup ref (state ^. aliasMap) = do
         let filtered = S.filter (/= lit' nullLit') aliases
@@ -222,4 +223,4 @@ removeSymbolicNull state (SymbolicRef ref _ _)
         return state
 
 removeSymbolicNull state ref =
-    stop state (expectedSymbolicReferenceErrorMessage "removeSymbolicNull" ref)
+    stop state (expectedSymbolicReferenceErrorMessage ref)

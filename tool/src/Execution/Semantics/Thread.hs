@@ -1,5 +1,6 @@
 module Execution.Semantics.Thread where
 
+import qualified GHC.Stack as GHC
 import qualified Data.Stack as T
 import qualified Data.Map as M
 import           Control.Monad (foldM)
@@ -19,14 +20,14 @@ import           Language.Syntax
 -- Stack Frame Management
 --------------------------------------------------------------------------------
 
-pushStackFrameOnCurrentThread :: ExecutionState -> Node -> DeclarationMember -> Maybe Lhs -> [(Parameter, Expression)] -> Engine r ExecutionState
+pushStackFrameOnCurrentThread :: GHC.HasCallStack => ExecutionState -> Node -> DeclarationMember -> Maybe Lhs -> [(Parameter, Expression)] -> Engine r ExecutionState
 pushStackFrameOnCurrentThread state returnPoint member lhs params
     | Just tid <- state ^. currentThreadId = 
         pushStackFrame state tid returnPoint member lhs params
     | otherwise =
-        stop state (cannotGetCurrentThreadErrorMessage "pushStackFrameOnCurrentThread")
+        stop state cannotGetCurrentThreadErrorMessage
 
-pushStackFrame :: ExecutionState -> ThreadId -> Node -> DeclarationMember -> Maybe Lhs -> [(Parameter, Expression)] -> Engine r ExecutionState
+pushStackFrame :: GHC.HasCallStack => ExecutionState -> ThreadId -> Node -> DeclarationMember -> Maybe Lhs -> [(Parameter, Expression)] -> Engine r ExecutionState
 pushStackFrame state0 tid returnPoint member lhs params = do
     let frame0 = StackFrame returnPoint lhs M.empty member
     state1 <- incrementLastHandlerPops state0 tid
@@ -36,9 +37,9 @@ pushStackFrame state0 tid returnPoint member lhs params = do
             let thread1 = thread0 & (callStack %~ T.push frame1)
             return $ updateThreadInState state2 thread1
         Nothing      ->
-            stop state1 (cannotGetThreadErrorMessage "pushStackFrame" tid)
+            stop state1 (cannotGetThreadErrorMessage tid)
 
-writeParam :: Thread -> (ExecutionState, StackFrame) -> (Parameter, Expression) -> Engine r (ExecutionState, StackFrame)
+writeParam :: GHC.HasCallStack => Thread -> (ExecutionState, StackFrame) -> (Parameter, Expression) -> Engine r (ExecutionState, StackFrame)
 writeParam thread (stateN, frameN) (Parameter _ name _, value0)
     -- The initial call
     | T.null (thread ^. callStack) && processTid == (thread ^. parent) = do
@@ -50,7 +51,7 @@ writeParam thread (stateN, frameN) (Parameter _ name _, value0)
         (stateN', value1) <- evaluate stateN value0
         return (stateN', writeDeclarationOnFrame frameN name value1)
 
-popStackFrame :: ExecutionState -> Engine r ExecutionState
+popStackFrame :: GHC.HasCallStack => ExecutionState -> Engine r ExecutionState
 popStackFrame state0 = do
     state1 <- decrementLastHandlerPops state0
     case getCurrentThread state1 of
@@ -58,7 +59,7 @@ popStackFrame state0 = do
             let thread1 = thread0 & (callStack %~ T.pop)
             return $ updateThreadInState state1 thread1
         Nothing     -> 
-            stop state1 (cannotGetCurrentThreadErrorMessage "popStackFrame")
+            stop state1 cannotGetCurrentThreadErrorMessage
 
 isLastStackFrame :: ExecutionState -> Bool
 isLastStackFrame state =

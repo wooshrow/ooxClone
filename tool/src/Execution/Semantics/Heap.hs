@@ -15,6 +15,7 @@ module Execution.Semantics.Heap(
 ) where
 
 import           Prelude hiding (lookup)
+import qualified GHC.Stack as GHC
 import           Control.Monad
 import qualified Data.Map as M
 import qualified Data.Set as S
@@ -46,7 +47,7 @@ dereference state ref = Heap.lookup ref (state ^. heap)
 -- Object handling
 --------------------------------------------------------------------------------
 
-writeConcreteField :: ExecutionState -> Reference -> Identifier -> Expression -> Engine r ExecutionState
+writeConcreteField :: GHC.HasCallStack => ExecutionState -> Reference -> Identifier -> Expression -> Engine r ExecutionState
 writeConcreteField state ref field value =
     case dereference state ref of
         Just (ObjectValue values ty) -> do
@@ -54,11 +55,11 @@ writeConcreteField state ref field value =
             let newStructure = ObjectValue (M.insert field value values) ty
             return $ state & (heap %~ Heap.insert ref newStructure)
         Just ArrayValue{} ->
-             stop state (expectedObjectErrorMessage "writeConcreteField")
+             stop state expectedObjectErrorMessage
         Nothing ->
-            stop state (uninitializedReferenceErrorMessage "writeConcreteField" ref)
+            stop state (uninitializedReferenceErrorMessage ref)
             
-writeSymbolicField :: ExecutionState -> Expression -> Identifier -> Expression -> Engine r ExecutionState
+writeSymbolicField :: GHC.HasCallStack => ExecutionState -> Expression -> Identifier -> Expression -> Engine r ExecutionState
 writeSymbolicField state2 ref@SymbolicRef{} field value =
     case AliasMap.lookup (ref ^?! SL.var) (state2 ^. aliasMap) of
         Just aliases -> 
@@ -69,7 +70,7 @@ writeSymbolicField state2 ref@SymbolicRef{} field value =
                 else 
                     foldM writeSymbolicAliasField state2 aliases
         Nothing -> 
-            stop state2 (noAliasesErrorMessage "writeSymbolicField")
+            stop state2 noAliasesErrorMessage
     where
         writeSymbolicAliasField :: ExecutionState -> Expression -> Engine r ExecutionState
         writeSymbolicAliasField stateN alias@Ref{} = do
@@ -81,9 +82,9 @@ writeSymbolicField _ (Lit NullLit{} _ _) _ _ =
     infeasible
 
 writeSymbolicField state value _ _ =
-    stop state (expectedSymbolicReferenceErrorMessage "writeSymbolicField" value)
+    stop state (expectedSymbolicReferenceErrorMessage value)
 
-readConcreteField :: ExecutionState -> Reference -> Identifier -> Engine r Expression
+readConcreteField :: GHC.HasCallStack => ExecutionState -> Reference -> Identifier -> Engine r Expression
 readConcreteField state ref field = 
     case dereference state ref of 
         Just (ObjectValue values _) ->
@@ -99,67 +100,67 @@ readConcreteField state ref field =
                 Just value ->
                     return value
                 Nothing -> 
-                    stop state (readOfUndeclaredFieldErrorMessge "readConcreteField" field)
+                    stop state (readOfUndeclaredFieldErrorMessge field)
         Just ArrayValue{} ->
-             stop state (expectedObjectErrorMessage "readConcreteField")
+             stop state expectedObjectErrorMessage
         Nothing ->
-            stop state (uninitializedReferenceErrorMessage "readConcreteField" ref)
+            stop state (uninitializedReferenceErrorMessage ref)
 
-readSymbolicField :: ExecutionState -> Expression -> Identifier -> Engine r Expression
+readSymbolicField :: GHC.HasCallStack => ExecutionState -> Expression -> Identifier -> Engine r Expression
 readSymbolicField state2 ref@SymbolicRef{} field =
     case AliasMap.lookup (ref ^?! SL.var) (state2 ^. aliasMap) of
         Just aliases -> do
             options <- mapM (readSymbolicAliasField state2) (S.toList aliases)
             return $ foldr (\ (concRef, value) -> conditional' (ref `equal'` concRef) value) (head options ^. _2) (tail options)
-        Nothing      -> stop state2 (noAliasesErrorMessage "readSymbolicField")
+        Nothing      -> stop state2 noAliasesErrorMessage
     where
-        readSymbolicAliasField :: ExecutionState -> Expression -> Engine r (Expression, Expression)
+        readSymbolicAliasField :: GHC.HasCallStack => ExecutionState -> Expression -> Engine r (Expression, Expression)
         readSymbolicAliasField stateN ref = (ref, ) <$> readConcreteField stateN (ref ^?! SL.ref) field
 
 readSymbolicField state ref _ =
-    stop state (expectedReferenceErrorMessage "readSymbolicField" ref)
+    stop state (expectedReferenceErrorMessage ref)
 
 --------------------------------------------------------------------------------
 -- Array handling
 --------------------------------------------------------------------------------
 
-sizeof :: ExecutionState -> Reference -> Engine r Int
+sizeof :: GHC.HasCallStack => ExecutionState -> Reference -> Engine r Int
 sizeof state ref = case dereference state ref of
     Just (ArrayValue elements) ->
         return (length elements)
     Just ObjectValue{} ->
-        stop state (expectedArrayErrorMessage "sizeof")
+        stop state expectedArrayErrorMessage
     Nothing ->
-        stop state (uninitializedReferenceErrorMessage "sizeof" ref)
+        stop state (uninitializedReferenceErrorMessage ref)
 
-readElem :: ExecutionState -> Reference -> EvaluationResult Int -> Engine r Expression
+readElem :: GHC.HasCallStack => ExecutionState -> Reference -> EvaluationResult Int -> Engine r Expression
 readElem state ref = either (readSymbolicElem state ref) (readConcreteElem state ref)
 
-readConcreteElem :: ExecutionState -> Reference -> Int -> Engine r Expression
+readConcreteElem :: GHC.HasCallStack => ExecutionState -> Reference -> Int -> Engine r Expression
 readConcreteElem state ref index = case dereference state ref of
     Just (ArrayValue values) 
         | index >= 0 && index < length values -> return (values ^?! element index)
         | otherwise -> infeasible
     Just ObjectValue{} ->
-        stop state (expectedArrayErrorMessage "readConcreteElem")
+        stop state expectedArrayErrorMessage
     Nothing ->
-        stop state (uninitializedReferenceErrorMessage "readConcreteElem" ref)
+        stop state (uninitializedReferenceErrorMessage ref)
         
-readSymbolicElem :: ExecutionState -> Reference -> Expression -> Engine r Expression
+readSymbolicElem :: GHC.HasCallStack => ExecutionState -> Reference -> Expression -> Engine r Expression
 readSymbolicElem state ref index = case dereference state ref of
     Just (ArrayValue values) -> do
         let indices = map (lit' . intLit') [1..]
         let value = foldr (\ (value, concIndex) -> conditional' (index `equal'` concIndex) value) (values ^?! _head) (zip (values ^?! _tail) indices)
         return value
     Just ObjectValue{} ->
-        stop state (expectedArrayErrorMessage "readSymbolicElem")
+        stop state expectedArrayErrorMessage
     Nothing ->
-        stop state (uninitializedReferenceErrorMessage "readSymbolicElem" ref)
+        stop state (uninitializedReferenceErrorMessage ref)
 
-writeElem :: ExecutionState -> Reference -> EvaluationResult Int -> Expression -> Engine r ExecutionState
+writeElem :: GHC.HasCallStack => ExecutionState -> Reference -> EvaluationResult Int -> Expression -> Engine r ExecutionState
 writeElem state ref = either (writeSymbolicElem state ref) (writeConcreteElem state ref)
 
-writeConcreteElem :: ExecutionState -> Reference -> Int -> Expression -> Engine r ExecutionState
+writeConcreteElem :: GHC.HasCallStack => ExecutionState -> Reference -> Int -> Expression -> Engine r ExecutionState
 writeConcreteElem state ref index value = case dereference state ref of
     Just (ArrayValue values)
         | index >= 0 && index < length values -> do
@@ -168,17 +169,17 @@ writeConcreteElem state ref index value = case dereference state ref of
         | otherwise -> 
             infeasible
     Just ObjectValue{} ->
-        stop state (expectedArrayErrorMessage "writeConcreteElem")
+        stop state expectedArrayErrorMessage
     Nothing ->             
-        stop state (uninitializedReferenceErrorMessage "writeConcreteElem" ref)
+        stop state (uninitializedReferenceErrorMessage ref)
 
-writeSymbolicElem :: ExecutionState -> Reference -> Expression -> Expression -> Engine r ExecutionState
+writeSymbolicElem :: GHC.HasCallStack => ExecutionState -> Reference -> Expression -> Expression -> Engine r ExecutionState
 writeSymbolicElem state ref index value = case dereference state ref of
     Just (ArrayValue values) -> do
         let indices = map (lit' . intLit') [0..]
         let newStructure = ArrayValue $ zipWith (\ oldValue concIndex -> conditional' (index `equal'` concIndex) value oldValue) values indices
         return $ state & (heap %~ Heap.insert ref newStructure)
     Just ObjectValue{} ->
-        stop state (expectedArrayErrorMessage "writeSymbolicElem")
+        stop state expectedArrayErrorMessage
     Nothing ->
-        stop state  (uninitializedReferenceErrorMessage "writeSymbolicElem" ref)
+        stop state (uninitializedReferenceErrorMessage ref)

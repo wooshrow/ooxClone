@@ -3,6 +3,7 @@ module Execution.Verification(
     , verify
 ) where
 
+import qualified GHC.Stack as GHC
 import qualified Data.Set as S
 import           Polysemy
 import           Z3.Monad hiding (substitute)
@@ -26,10 +27,10 @@ import           Language.Syntax.Pretty()
 -- Verification Interface
 --------------------------------------------------------------------------------
 
-verifyM :: ExecutionState -> Maybe Expression -> Engine r ExecutionState
+verifyM :: GHC.HasCallStack => ExecutionState -> Maybe Expression -> Engine r ExecutionState
 verifyM state = maybe (return state) (verify state)
 
-verify :: ExecutionState -> Expression -> Engine r ExecutionState
+verify :: GHC.HasCallStack => ExecutionState -> Expression -> Engine r ExecutionState
 verify state expression = do
     config <- askConfig
     if cacheFormulas config
@@ -40,7 +41,7 @@ verify state expression = do
                 else store expression >> verify' state expression
         else verify' state expression
 
-verify' :: ExecutionState -> Expression -> Engine r ExecutionState
+verify' :: GHC.HasCallStack => ExecutionState -> Expression -> Engine r ExecutionState
 verify' state0 expression0 = do
     (state1, concretizations) <- concretesOfType state0 REFRuntimeType expression0
     void $ concretizeMap concretizations state1 $ \ state2 -> do
@@ -60,29 +61,29 @@ verify' state0 expression0 = do
                     Undef -> unknown state3 expression3
     return state0
 
-substitute :: ExecutionState -> Expression -> Engine r Expression
+substitute :: GHC.HasCallStack => ExecutionState -> Expression -> Engine r Expression
 substitute state = foldExpression algebra
     where
         algebra = identityMExpressionAlgebra
             { fSymRef = substituteSymbolicRef state }
 
-substituteSymbolicRef :: ExecutionState -> Identifier -> RuntimeType -> Position -> Engine r Expression
+substituteSymbolicRef :: GHC.HasCallStack => ExecutionState -> Identifier -> RuntimeType -> Position -> Engine r Expression
 substituteSymbolicRef state ref _ _
     | Just aliases <- AliasMap.lookup ref (state ^. aliasMap) =
         case S.size aliases of
             1 -> return $ S.elemAt 0 aliases
-            n -> stop state (exactlyOneAliasErrorMessage "substituteSymbolicRef" n)
+            n -> stop state (exactlyOneAliasErrorMessage n)
     | otherwise =
-        stop state (noAliasesErrorMessage "substituteSymbolicRef")
+        stop state noAliasesErrorMessage
 
 --------------------------------------------------------------------------------
 -- Verification Engine
 --------------------------------------------------------------------------------
 
-verifyZ3 :: Expression -> Z3 (Result, Maybe Model)
+verifyZ3 :: GHC.HasCallStack => Expression -> Z3 (Result, Maybe Model)
 verifyZ3 formula = (assert =<< construct formula) >> solverCheckAndGetModel
 
-construct :: Expression -> Z3 AST
+construct :: GHC.HasCallStack => Expression -> Z3 AST
 construct e@BinOp{} = do
     lhs <- construct (e ^?! SL.lhs)
     rhs <- construct (e ^?! SL.rhs)
@@ -124,7 +125,7 @@ construct e@Conditional{} = do
 
 construct e = error $ "construct missing: " ++ show e
 
-runtimeTypeToSort :: RuntimeType -> Z3 Sort
+runtimeTypeToSort :: GHC.HasCallStack => RuntimeType -> Z3 Sort
 runtimeTypeToSort ty = case ty of
     IntRuntimeType           -> mkIntSort
     BoolRuntimeType          -> mkBoolSort

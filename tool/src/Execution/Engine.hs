@@ -2,6 +2,7 @@ module Execution.Engine(
     execute
 ) where
 
+import qualified GHC.Stack as GHC
 import qualified Data.Set as S
 import           Data.Maybe (fromJust)
 import           System.Random.Shuffle
@@ -68,7 +69,7 @@ start state0 initialMethod = do
 -- Process Execution 
 
 -- | Symbolically executes the program.
-execP :: ExecutionState -> Engine r ExecutionState
+execP :: GHC.HasCallStack => ExecutionState -> Engine r ExecutionState
 execP state0 = do
     let allThreads = state0 ^. threads
     if null allThreads 
@@ -89,7 +90,7 @@ execP state0 = do
 -- Thread Execution
 
 -- | Symbolically executes the thread.
-execT :: ExecutionState -> CFGContext -> Engine r ExecutionState
+execT :: GHC.HasCallStack => ExecutionState -> CFGContext -> Engine r ExecutionState
 execT state (_, _, ExceptionalNode, _) = do
     state1 <- execException state
     uncurry stepM state1
@@ -99,7 +100,7 @@ execT state0 (_, _, StatNode (Call invocation _ _), [(_, neighbour)]) = do
     step state1 ((), entry)
 
 execT state0 (_, _, StatNode Call{}, neighbours) =
-    stop state0 (expectedNumberOfNeighboursErrorMessage "execT" 1 (length neighbours))
+    stop state0 (expectedNumberOfNeighboursErrorMessage 1 (length neighbours))
 
 -- A Member Entry
 execT state0 (_, _, MemberEntry{}, neighbours) = do
@@ -112,7 +113,7 @@ execT state0 (_, _, MemberExit returnTy _ _ _, []) = do
     uncurry stepM state1
 
 execT state0 (_, _, MemberExit{}, neighbours) =
-    stop state0 (expectedNumberOfNeighboursErrorMessage "execT" 0 (length neighbours))
+    stop state0 (expectedNumberOfNeighboursErrorMessage 0 (length neighbours))
 
 -- A Try Entry
 execT state0 (_, _, TryEntry handler, neighbours) = do

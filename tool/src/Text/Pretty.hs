@@ -8,6 +8,7 @@ module Text.Pretty(
 ) where
 
 import           Prelude hiding ((<>))
+import qualified GHC.Stack as GHC
 import           Text.PrettyPrint
 import qualified Data.Set as S 
 import qualified Data.Map as M
@@ -57,6 +58,9 @@ instance (Pretty k, Pretty v) => Pretty (M.Map k v) where
     pretty = brackets . commas . map prettyElem . M.toList
         where
             prettyElem (k, v) = pretty k <> pretty "->" <> pretty v
+
+instance Pretty GHC.CallStack where
+    pretty = text . GHC.prettyCallStack
 
 dot :: Doc
 dot = char '.'

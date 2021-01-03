@@ -1,13 +1,14 @@
 module Data.Error where
 
-import           Prelude                   hiding ((<>))
-import           Data.List                        (intercalate)
+import           Prelude hiding ((<>))
+import qualified GHC.Stack as GHC
+import           Data.List (intercalate)
 import           Control.Lens.Extras
 import           Data.Positioned
 import           Text.Pretty
 import           Language.Syntax
 import           Language.Syntax.Pretty()
-import qualified Language.Syntax.Lenses   as SL
+import qualified Language.Syntax.Lenses as SL
 
 type Erroneous a = Either ErrorMessage a
 
@@ -16,15 +17,17 @@ data ErrorMessage
     deriving (Show)
 
 instance Pretty ErrorMessage where
-    pretty ErrorMessage{..}
-        = text "Error" <+> maybe empty pretty position <> colon 
-        $+$ tab (pretty err)
+    pretty ErrorMessage{..} = 
+        maybe empty pretty position <+> pretty err
+
+    prettyDebug ErrorMessage{..} =
+        maybe empty pretty position <+> prettyDebug err
 
 data ErrorType
     = LexicalError     { message :: String }
     | SyntacticalError { message :: String }
     | SemanticalError  { message :: String }
-    | OtherError       { message :: String }
+    | OtherError       { message :: String, origin :: GHC.CallStack }
     deriving (Show)
 
 instance Pretty ErrorType where
@@ -33,14 +36,18 @@ instance Pretty ErrorType where
     pretty SemanticalError{..}  = pretty message
     pretty OtherError{..}       = pretty message
 
-lexicalError :: Position -> String -> ErrorMessage
+    prettyDebug OtherError{..} = pretty message $+$ pretty origin
+    prettyDebug errorType      = pretty errorType
+
+lexicalError ::  Position -> String -> ErrorMessage
 lexicalError pos = ErrorMessage (Just pos) . LexicalError 
 
 syntacticalError :: Position -> String -> ErrorMessage
 syntacticalError pos = ErrorMessage (Just pos) . SyntacticalError
 
-otherError :: String -> ErrorMessage
-otherError = ErrorMessage Nothing . OtherError
+otherError :: GHC.HasCallStack => String -> ErrorMessage
+otherError message = ErrorMessage Nothing $ 
+    OtherError message (GHC.popCallStack (GHC.popCallStack GHC.callStack))
 
 readOfUndeclaredVarError :: Identifier -> ErrorMessage
 readOfUndeclaredVarError (Identifier var pos) 

@@ -3,6 +3,7 @@ module Execution.Semantics.Assignment(
     , execRhs
 ) where
 
+import qualified GHC.Stack as GHC
 import qualified Data.Set as S
 import           Control.Monad (foldM)
 import           Control.Monad.Extra
@@ -21,7 +22,7 @@ import           Execution.Semantics.Concretization
 import           Language.Syntax
 import qualified Language.Syntax.Lenses as SL
 
-execLhs :: ExecutionState -> Lhs -> Expression -> Engine r ExecutionState
+execLhs :: GHC.HasCallStack => ExecutionState -> Lhs -> Expression -> Engine r ExecutionState
 execLhs state0 lhs@LhsVar{} value =
     writeDeclaration state0 (lhs ^?! SL.var) value
 
@@ -38,7 +39,7 @@ execLhs state0 lhs@LhsField{} value = do
             state2 <- removeSymbolicNull state1 ref
             writeSymbolicField state2 ref field value
         _ -> 
-            stop state0 (expectedReferenceErrorMessage "execLhs" ref)
+            stop state0 (expectedReferenceErrorMessage ref)
             
 execLhs state0 lhs@LhsElem{} value = do
     ref <- readDeclaration state0 (lhs ^?! SL.var)
@@ -58,13 +59,13 @@ execLhs state0 lhs@LhsElem{} value = do
                             let (Ref ref _ _) = S.elemAt 0 refs
                             writeElem state3 ref index value
                         | otherwise ->
-                            stop state2 (exactlyOneAliasErrorMessage "execLhs" (length refs))
+                            stop state2 (exactlyOneAliasErrorMessage (length refs))
                     Nothing -> 
-                        stop state2 (noAliasesErrorMessage "execLhs")
+                        stop state2 noAliasesErrorMessage
         _ ->
-            stop state0 (expectedReferenceErrorMessage "execLhs" ref)
+            stop state0 (expectedReferenceErrorMessage ref)
 
-execRhs :: ExecutionState -> Rhs -> Engine r (ExecutionState, Expression)
+execRhs :: GHC.HasCallStack => ExecutionState -> Rhs -> Engine r (ExecutionState, Expression)
 execRhs state0 rhs@RhsExpression{} = do
     (state1, concretizations) <- concretesOfType state0 ARRAYRuntimeType (rhs ^?! SL.value)
     concretizeWithResult concretizations state1 $ \ state2 -> do
@@ -91,24 +92,24 @@ execRhs state0 rhs@RhsElem{} = do
                         state1 <- writeDeclaration state0 var alias
                         execRhs state1 rhs
                     | otherwise -> 
-                        stop state0 (exactlyOneAliasErrorMessage "execRhs" (S.size aliases))
+                        stop state0 (exactlyOneAliasErrorMessage (S.size aliases))
                 Nothing -> 
-                    stop state0 (noAliasesErrorMessage "execRhs")
+                    stop state0 noAliasesErrorMessage
         Ref{} -> do
             (state1, index) <- evaluateAsInt state0 (rhs ^?! SL.index)
             value <- readElem state1 (ref ^?! SL.ref) index
             return (state1, value)
         _ ->
-            stop state0 (expectedReferenceErrorMessage "execRhs" ref)
+            stop state0 (expectedReferenceErrorMessage ref)
 
 execRhs state0 rhs@RhsArray{} = do 
     (state1, sizes) <- mapAccumM evaluateAsInt state0 (rhs ^?! SL.sizes)
     execNewArray state1 sizes (typeOf rhs)
 
 execRhs state RhsCall{} =
-    stop state (expectedNoMethodCallErrorMessage "execRhs")
+    stop state expectedNoMethodCallErrorMessage
 
-execRhsField :: ExecutionState -> Expression -> Identifier -> Engine r (ExecutionState, Expression)
+execRhsField :: GHC.HasCallStack => ExecutionState -> Expression -> Identifier -> Engine r (ExecutionState, Expression)
 execRhsField state0 (Conditional guard true0 false0 ty info) field =  do
     (state1, true1)  <- execRhsField state0 true0 field
     (state2, false1) <- execRhsField state1 false0 field
@@ -126,9 +127,9 @@ execRhsField state0 ref@SymbolicRef{} field = do
     (state1,) <$> readSymbolicField state2 ref field
 
 execRhsField state ref _ =
-    stop state (expectedReferenceErrorMessage "execRhsField" ref)
+    stop state (expectedReferenceErrorMessage ref)
 
-execNewArray :: ExecutionState -> [EvaluationResult Int] -> RuntimeType -> Engine r (ExecutionState, Expression)
+execNewArray :: GHC.HasCallStack => ExecutionState -> [EvaluationResult Int] -> RuntimeType -> Engine r (ExecutionState, Expression)
 execNewArray state [Right size] ty = do
     let elemTy    = ty ^?! SL.innerTy
     let structure = ArrayValue (replicate size (defaultValue elemTy))
@@ -139,11 +140,11 @@ execNewArray state0 (Right size:sizes) ty = do
     let structure = ArrayValue refs
     allocate state1 structure
     where
-        execNewInnerArray :: (ExecutionState, [Expression]) -> Engine r (ExecutionState, [Expression])
+        execNewInnerArray :: GHC.HasCallStack => (ExecutionState, [Expression]) -> Engine r (ExecutionState, [Expression])
         execNewInnerArray (state1, refs) = do
             let elemTy = ty ^?! SL.innerTy
             (state2, ref) <- execNewArray state1 sizes elemTy
             return (state2, ref : refs)
 
 execNewArray state (Left size:_) _ =
-    stop state (expectedConcreteValueErrorMessge "execNewArray" size)
+    stop state (expectedConcreteValueErrorMessge size)

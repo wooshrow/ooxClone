@@ -3,6 +3,7 @@ module Execution.Semantics.PartialOrderReduction(
     , por
 ) where
 
+import qualified GHC.Stack as GHC
 import qualified Data.Set as S
 import           Control.Lens ((&), (^?!), (^.), (.~), (?~))
 import           Control.Monad
@@ -22,7 +23,7 @@ import           Language.Syntax.Fold
 import           Language.Syntax.DSL
 import qualified Language.Syntax.Lenses as SL
 
-isEnabled :: ExecutionState -> Thread -> Engine r Bool
+isEnabled :: GHC.HasCallStack => ExecutionState -> Thread -> Engine r Bool
 isEnabled state thread
     | (_, _, StatNode (Lock var _ _), _) <- thread ^. pc = do
         ref <- readDeclaration (state & currentThreadId ?~ (thread ^. tid)) var
@@ -36,7 +37,7 @@ isEnabled state thread
                     Just tid' -> return (tid' == thread ^. tid)
                     Nothing   -> return True
             _ -> 
-                stop state (expectedReferenceErrorMessage "isEnabled" ref)
+                stop state (expectedReferenceErrorMessage ref)
     | (_, _, StatNode (Join _ _), _) <- thread ^. pc = 
         S.null <$> children state (thread ^. tid)
     | otherwise = 
@@ -46,7 +47,7 @@ children :: ExecutionState -> ThreadId -> Engine r (S.Set Thread)
 children state tid =
     return $ S.filter (\ thread -> thread ^. parent == tid) (state ^. threads)
 
-por :: ExecutionState -> [Thread] -> Engine r (ExecutionState, [Thread])
+por :: GHC.HasCallStack => ExecutionState -> [Thread] -> Engine r (ExecutionState, [Thread])
 por state0 []      = deadlock state0
 por state0 threads = do
     config <- askConfig
@@ -70,7 +71,7 @@ isUniqueInterleaving state thread = do
         isUnique _ NotIndependentConstraint{} = 
             False
 
-generate :: ExecutionState -> [Thread] -> Engine r ExecutionState
+generate :: GHC.HasCallStack => ExecutionState -> [Thread] -> Engine r ExecutionState
 generate state threads = do
     let pairs = [(x, y) | let list = threads, x <- list, y <- list, x < y]
     new <- foldM construct [] pairs
@@ -97,25 +98,25 @@ isConflict new (NotIndependentConstraint x1 y1) = flip any new $ \case
 
 type ReadWriteSet = (S.Set Reference, S.Set Reference)
 
-isIndependent :: ExecutionState -> (Thread, Thread) -> Engine r Bool
+isIndependent :: GHC.HasCallStack => ExecutionState -> (Thread, Thread) -> Engine r Bool
 isIndependent state (thread1, thread2) = do
     (wT1, rT1) <- dependentOperationsOfT state thread1
     (wT2, rT2) <- dependentOperationsOfT state thread2
     return $ S.disjoint wT1 wT2 && S.disjoint rT1 wT2 && S.disjoint rT2 wT1
 
 -- | Returns the reads and writes of the current thread.
-dependentOperationsOfT :: ExecutionState -> Thread -> Engine r ReadWriteSet
+dependentOperationsOfT :: GHC.HasCallStack => ExecutionState -> Thread -> Engine r ReadWriteSet
 dependentOperationsOfT state thread = dependentOperationsOfN state (thread ^. tid) (thread ^. pc)
 
 -- | Returns the reads and writes of the current program counter.
-dependentOperationsOfN :: ExecutionState -> ThreadId -> CFGContext -> Engine r ReadWriteSet
+dependentOperationsOfN :: GHC.HasCallStack => ExecutionState -> ThreadId -> CFGContext -> Engine r ReadWriteSet
 dependentOperationsOfN state tid (_, _, StatNode stat, _) 
     = dependentOperationsOfS state tid stat
 dependentOperationsOfN _ _ _
     = return (S.empty, S.empty)
 
 -- | Returns the reads and writes of the current statement.
-dependentOperationsOfS :: ExecutionState -> ThreadId -> Statement -> Engine r ReadWriteSet
+dependentOperationsOfS :: GHC.HasCallStack => ExecutionState -> ThreadId -> Statement -> Engine r ReadWriteSet
 dependentOperationsOfS state tid (Assign lhs rhs _ _) = (,)        <$> dependentOperationsOfLhs state tid lhs <*> dependentOperationsOfRhs state tid rhs
 dependentOperationsOfS state tid (Assert ass _ _)     = (,S.empty) <$> dependentOperationsOfE state tid ass
 dependentOperationsOfS state tid (Assume ass _ _)     = (,S.empty) <$> dependentOperationsOfE state tid ass
@@ -135,14 +136,14 @@ dependentOperationsOfRhs state tid (RhsElem var _ _ _)  = getReferences state ti
 dependentOperationsOfRhs _     _   RhsCall{}            = return S.empty
 dependentOperationsOfRhs _     _   RhsArray{}           = return S.empty
 
-dependentOperationsOfE :: ExecutionState -> ThreadId -> Expression -> Engine r (S.Set Reference)
+dependentOperationsOfE :: GHC.HasCallStack => ExecutionState -> ThreadId -> Expression -> Engine r (S.Set Reference)
 dependentOperationsOfE state tid = foldExpression algebra
     where
         algebra = monoidMExpressionAlgebra
             { fForall = \ _ _ domain _ _ _ -> getReferences state tid domain
             , fExists = \ _ _ domain _ _ _ -> getReferences state tid domain }
 
-getReferences :: ExecutionState -> ThreadId -> Identifier -> Engine r (S.Set Reference)
+getReferences :: GHC.HasCallStack => ExecutionState -> ThreadId -> Identifier -> Engine r (S.Set Reference)
 getReferences state tid var = do
     ref <- readDeclaration (state & currentThreadId ?~ tid) var
     case ref of
@@ -153,6 +154,6 @@ getReferences state tid var = do
         SymbolicRef{}     ->
             case AliasMap.lookup (ref ^?! SL.var) (state ^. aliasMap) of
                 Just aliases -> return . S.map (^?! SL.ref) . S.filter (/= lit' nullLit') $ aliases
-                Nothing      -> stop state (noAliasesErrorMessage "getReferences")
+                Nothing      -> stop state noAliasesErrorMessage
         _ ->
-            stop state (expectedReferenceErrorMessage "getReferences" ref)
+            stop state (expectedReferenceErrorMessage ref)

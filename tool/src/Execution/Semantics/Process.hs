@@ -4,6 +4,7 @@ module Execution.Semantics.Process(
     , freshTid
 ) where
 
+import qualified GHC.Stack as GHC
 import qualified Data.Stack as T
 import qualified Data.Set as S
 import           Text.Pretty
@@ -17,7 +18,7 @@ import           Execution.State.Thread
 import           Language.Syntax
 import qualified Language.Syntax.Lenses as SL
 
-spawn :: ExecutionState -> ThreadId -> DeclarationMember -> [Expression] -> Engine r (ExecutionState, ThreadId)
+spawn :: GHC.HasCallStack => ExecutionState -> ThreadId -> DeclarationMember -> [Expression] -> Engine r (ExecutionState, ThreadId)
 spawn state0 parent member arguments = do
     cfg <- askCFG
     let tid        = freshTid state0
@@ -29,15 +30,15 @@ spawn state0 parent member arguments = do
     debug ("Spawning thread with thread id '" ++ toDebugString tid ++ "'")
     return (state2 & (numberOfForks +~ 1), tid)
 
-despawnCurrentThread :: ExecutionState -> Engine r ExecutionState
+despawnCurrentThread ::  GHC.HasCallStack => ExecutionState -> Engine r ExecutionState
 despawnCurrentThread state0
     | Just thread <- getCurrentThread state0 = do
         state1 <- despawn state0 thread
         return $ state1 & (currentThreadId .~ Nothing)
     | otherwise =
-        stop state0 (cannotGetCurrentThreadErrorMessage "despawnCurrentThread")
+        stop state0 cannotGetCurrentThreadErrorMessage
 
-despawn :: ExecutionState -> Thread -> Engine r ExecutionState
+despawn :: GHC.HasCallStack => ExecutionState -> Thread -> Engine r ExecutionState
 despawn state thread = do
     debug ("Despawning thread with id '" ++ toDebugString (thread ^. tid) ++ "'")
     let index = S.findIndex thread (state ^. threads)

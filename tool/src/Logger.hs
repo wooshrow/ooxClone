@@ -4,6 +4,7 @@ module Logger(
     , debug
 ) where
 
+import GHC.Stack
 import Control.Monad
 import Polysemy
 import Polysemy.Trace
@@ -17,7 +18,7 @@ inform message = do
     when (logLevel >= 1) $
         construct message
 
-debug :: (HasConfiguration a, Members [Reader a, Trace, Embed IO] r) => String -> Sem r ()
+debug :: (HasCallStack, HasConfiguration a, Members [Reader a, Trace, Embed IO] r) => String -> Sem r ()
 debug message = do
     Configuration{logLevel} <- configuration <$> ask
     when (logLevel >= 2) $

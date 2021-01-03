@@ -16,6 +16,7 @@ module Execution.Semantics(
     , execAssign
 ) where
        
+import qualified GHC.Stack as GHC
 import qualified Data.Set as S
 import qualified Data.Map as M
 import           Data.Maybe
@@ -47,7 +48,7 @@ import           Execution.State.PathConstraints as PathConstraints
 import           Execution.State.LockSet as LockSet
 import           Execution.Verification
 
-execAssert :: ExecutionState -> Expression -> Engine r ExecutionState
+execAssert :: GHC.HasCallStack => ExecutionState -> Expression -> Engine r ExecutionState
 execAssert state0 assertion = do
     measureVerification
     let assumptions = state0 ^. constraints
@@ -65,7 +66,7 @@ execAssert state0 assertion = do
                 _ <- verify state3 (formula2 & SL.info .~ getPos assertion)
                 return state3
     
-execAssertEnsures :: ExecutionState -> Engine r ExecutionState
+execAssertEnsures :: GHC.HasCallStack => ExecutionState -> Engine r ExecutionState
 execAssertEnsures state = do
     config <- askConfig
     if verifyRequires config
@@ -76,11 +77,11 @@ execAssertEnsures state = do
                     let ensures = frame ^. currentMember ^?! SL.specification ^?! SL.ensures
                     maybe (return state) (execAssert state) ensures
                 Nothing ->
-                    stop state (cannotGetCurrentThreadErrorMessage "execAssertEnsures")
+                    stop state cannotGetCurrentThreadErrorMessage
         else 
             return state
 
-execAssertRequires :: ExecutionState -> Engine r ExecutionState
+execAssertRequires :: GHC.HasCallStack => ExecutionState -> Engine r ExecutionState
 execAssertRequires state = do
     config <- askConfig
     if verifyRequires config
@@ -91,11 +92,11 @@ execAssertRequires state = do
                     let requires = frame ^. currentMember ^?! SL.specification ^?! SL.requires
                     maybe (return state) (execAssert state) requires
                 Nothing ->
-                    stop state (cannotGetCurrentThreadErrorMessage "execAssertRequires")
+                    stop state cannotGetCurrentThreadErrorMessage
         else 
             return state
 
-execAssertExceptional :: ExecutionState -> Engine r ExecutionState
+execAssertExceptional :: GHC.HasCallStack => ExecutionState -> Engine r ExecutionState
 execAssertExceptional state = do
     config <- askConfig
     if verifyExceptional config
@@ -106,11 +107,11 @@ execAssertExceptional state = do
                     let exceptional = frame ^. currentMember ^?! SL.specification ^?! SL.exceptional
                     maybe (return state) (execAssert state) exceptional
                 Nothing     ->
-                    stop state (cannotGetCurrentThreadErrorMessage "execAssertExceptional")
+                    stop state cannotGetCurrentThreadErrorMessage
         else
             return state
 
-execAssume :: ExecutionState -> Expression -> Engine r ExecutionState
+execAssume :: GHC.HasCallStack => ExecutionState -> Expression -> Engine r ExecutionState
 execAssume state0 assumption0 = do
     (state1, concretizations) <- concretesOfType state0 ARRAYRuntimeType assumption0
     concretize concretizations state1 $ \ state2 -> do
@@ -125,7 +126,7 @@ execAssume state0 assumption0 = do
                 debug ("Adding constraint: '" ++ toString assumption2 ++ "'")
                 return $ state3 & (constraints <>~ PathConstraints.singleton assumption2)
 
-execInvocation :: ExecutionState -> Invocation -> Maybe Lhs -> Node -> Engine r (ExecutionState, Node)
+execInvocation :: GHC.HasCallStack => ExecutionState -> Invocation -> Maybe Lhs -> Node -> Engine r (ExecutionState, Node)
 execInvocation state0 invocation lhs neighbour
     | Just (declaration, member) <- invocation ^. SL.resolved = do
         let arguments = invocation ^. SL.arguments
@@ -144,16 +145,16 @@ execInvocation state0 invocation lhs neighbour
                     state3 <- execConstructor state2 member arguments lhs neighbour
                     return (state3, fst labels)
                 Field _ name _ -> 
-                    stop state2 (expectedMethodMemberErrorMessage "execInvocation" name)
+                    stop state2 (expectedMethodMemberErrorMessage name)
     | otherwise = 
-        stop state0 (unresolvedErrorMessage "execInvocation")
+        stop state0 unresolvedErrorMessage
 
-execStaticMethod :: ExecutionState -> DeclarationMember -> [Expression] -> Maybe Lhs -> Node -> Engine r ExecutionState
+execStaticMethod :: GHC.HasCallStack => ExecutionState -> DeclarationMember -> [Expression] -> Maybe Lhs -> Node -> Engine r ExecutionState
 execStaticMethod state method arguments lhs neighbour = do
     let parameters = method ^?! SL.params
     pushStackFrameOnCurrentThread state neighbour method lhs (zip parameters arguments)
 
-execMethod :: ExecutionState -> DeclarationMember -> [Expression] -> Maybe Lhs -> Node -> (NonVoidType, Identifier) -> Engine r ExecutionState
+execMethod :: GHC.HasCallStack => ExecutionState -> DeclarationMember -> [Expression] -> Maybe Lhs -> Node -> (NonVoidType, Identifier) -> Engine r ExecutionState
 execMethod state method arguments lhs neighbour this = do
     -- Construct the parameters and arguments, with 'this' as an implicit parameter.
     let parameters' = parameter' (fst this) this' : method ^?! SL.params
@@ -161,7 +162,7 @@ execMethod state method arguments lhs neighbour this = do
     -- Push a new stack frame.
     pushStackFrameOnCurrentThread state neighbour method lhs (zip parameters' arguments')
 
-execConstructor :: ExecutionState -> DeclarationMember -> [Expression] -> Maybe Lhs -> Node -> Engine r ExecutionState
+execConstructor :: GHC.HasCallStack => ExecutionState -> DeclarationMember -> [Expression] -> Maybe Lhs -> Node -> Engine r ExecutionState
 execConstructor state0 constructor arguments lhs neighbour  = do
     -- Construct the parameters, with 'this' as an implicit parameter.
     let className  = constructor ^?! SL.name
@@ -174,21 +175,21 @@ execConstructor state0 constructor arguments lhs neighbour  = do
     -- Push a new stack frame.
     pushStackFrameOnCurrentThread state1 neighbour constructor lhs (zip parameters arguments')
 
-execFork :: ExecutionState -> DeclarationMember -> [Expression] -> Engine r (ExecutionState, ThreadId)
+execFork :: GHC.HasCallStack => ExecutionState -> DeclarationMember -> [Expression] -> Engine r (ExecutionState, ThreadId)
 execFork state member arguments
     | Just parent <- state ^. currentThreadId =
         spawn state parent member arguments
     | otherwise = 
-        stop state (cannotGetCurrentThreadErrorMessage "execFork")
+        stop state cannotGetCurrentThreadErrorMessage
 
-execMemberEntry :: ExecutionState -> Engine r ExecutionState
+execMemberEntry :: GHC.HasCallStack => ExecutionState -> Engine r ExecutionState
 execMemberEntry state =
     -- Verify the pre condition if this is the first call.
     case state ^. programTrace of
         [] -> return state
         _  -> execAssertRequires state
 
-execMemberExit :: ExecutionState -> RuntimeType -> Engine r (ExecutionState, Maybe ((), Node))
+execMemberExit :: GHC.HasCallStack => ExecutionState -> RuntimeType -> Engine r (ExecutionState, Maybe ((), Node))
 execMemberExit state0 returnTy = do
     -- Verify the post-condition
     state1 <- execAssertEnsures state0
@@ -201,7 +202,7 @@ execMemberExit state0 returnTy = do
         else
             case getCurrentThread state1 of
                 Nothing ->
-                    stop state1 (cannotGetCurrentThreadErrorMessage "execMemberExit")
+                    stop state1 cannotGetCurrentThreadErrorMessage
                 Just thread1 -> do
                     let oldFrame  = fromJust (getLastStackFrame thread1)
                     let neighbour = Just ((), oldFrame ^. returnPoint)
@@ -217,7 +218,7 @@ execMemberExit state0 returnTy = do
                             -- No assignment to be done, continue the execution.
                             return (state2, neighbour)
 
-execReturn :: ExecutionState -> Maybe Expression -> Engine r ExecutionState
+execReturn :: GHC.HasCallStack => ExecutionState -> Maybe Expression -> Engine r ExecutionState
 execReturn state Nothing =
     return state
 
@@ -227,7 +228,7 @@ execReturn state0 (Just expression) = do
         (state3, retval) <- evaluate state2 expression
         writeDeclaration state3 retval' retval
 
-execException :: ExecutionState -> Engine r (ExecutionState, Maybe ((), Node))
+execException :: GHC.HasCallStack => ExecutionState -> Engine r (ExecutionState, Maybe ((), Node))
 execException state0
     -- Within a try block.
     | Just (handler, pops) <- findLastHandler state0 = do
@@ -251,21 +252,21 @@ execException state0
                 state2 <- popStackFrame state1
                 execException state2
 
-execTryEntry :: ExecutionState -> Node -> Engine r ExecutionState
+execTryEntry :: GHC.HasCallStack => ExecutionState -> Node -> Engine r ExecutionState
 execTryEntry = insertHandler
 
-execTryExit :: ExecutionState -> Engine r ExecutionState
+execTryExit :: GHC.HasCallStack => ExecutionState -> Engine r ExecutionState
 execTryExit = removeLastHandler
 
-execCatchEntry :: ExecutionState -> Engine r ExecutionState
+execCatchEntry :: GHC.HasCallStack => ExecutionState -> Engine r ExecutionState
 execCatchEntry = removeLastHandler
 
-execDeclare :: ExecutionState -> NonVoidType -> Identifier -> Engine r ExecutionState
+execDeclare :: GHC.HasCallStack => ExecutionState -> NonVoidType -> Identifier -> Engine r ExecutionState
 execDeclare state0 ty var = do
     let value = defaultValue ty
     writeDeclaration state0 var value
 
-execLock :: ExecutionState -> Identifier -> Engine r ExecutionState
+execLock :: GHC.HasCallStack => ExecutionState -> Identifier -> Engine r ExecutionState
 execLock state0 var = do
     ref <- readDeclaration state0 var 
     case ref of
@@ -284,20 +285,20 @@ execLock state0 var = do
                         Nothing -> 
                             return $ state0 & (locks %~ LockSet.insert ref currentTid)
                 Nothing -> 
-                    stop state0 (cannotGetCurrentThreadErrorMessage "execLock")
+                    stop state0 cannotGetCurrentThreadErrorMessage
         _ -> 
-            stop state0 (expectedReferenceErrorMessage "execLock" ref)
+            stop state0 (expectedReferenceErrorMessage ref)
 
-execUnlock :: ExecutionState -> Identifier -> Engine r ExecutionState
+execUnlock :: GHC.HasCallStack => ExecutionState -> Identifier -> Engine r ExecutionState
 execUnlock state var = do
     ref <- readDeclaration state var
     case ref of
         Ref{} -> 
             return $ state & (locks %~ LockSet.remove (ref ^?! SL.ref))
         _ -> 
-            stop state (expectedConcreteReferenceErrorMessage "execUnock" ref)
+            stop state (expectedConcreteReferenceErrorMessage ref)
 
-execAssign :: ExecutionState -> Lhs -> Rhs -> Engine r ExecutionState
+execAssign :: GHC.HasCallStack => ExecutionState -> Lhs -> Rhs -> Engine r ExecutionState
 execAssign state0 _ RhsCall{} = 
     return state0
 execAssign state0 lhs rhs = do

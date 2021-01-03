@@ -19,6 +19,6 @@ executionPhase :: Members [Error ErrorMessage, State Statistics, Trace, Reader C
 executionPhase table cfg = do
     inform "Starting the Symbolic Execution Phase"
     result <- execute table cfg
-    inform (toString result)
+    inform (toDebugString result)
     inform "Symbolic Execution Phase succeeded"
     return result
