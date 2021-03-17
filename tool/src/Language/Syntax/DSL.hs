@@ -62,13 +62,13 @@ implies' :: Expression -> Expression -> Expression
 implies' lhs rhs = BinOp Implies lhs rhs BoolRuntimeType (getPos lhs)
 
 ands' :: Foldable f => f Expression -> Expression
-ands' = foldr1 and'
+ands' = foldr and' (lit' (boolLit' True))
 
 and' :: Expression -> Expression -> Expression
 and' lhs rhs = BinOp And lhs rhs BoolRuntimeType (getPos lhs)
 
 ors' :: Foldable f => f Expression -> Expression
-ors' = foldr1 or'
+ors' = foldr or' (lit' (boolLit' False))
 
 or' :: Expression -> Expression -> Expression
 or' lhs rhs = BinOp Or lhs rhs BoolRuntimeType (getPos lhs)
