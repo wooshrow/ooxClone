@@ -13,7 +13,7 @@ import           Language.Syntax
 import           Analysis.Type.Typeable
 
 newtype Heap = Heap { unHeap :: M.Map Reference HeapValue }
-    deriving (Show)
+    deriving (Show, Eq, Ord)
     
 instance Semigroup Heap where
     (Heap a) <> (Heap b) = Heap (a <> b)
@@ -27,7 +27,7 @@ instance Pretty.Pretty Heap where
 data HeapValue 
     = ObjectValue (M.Map Identifier Expression) RuntimeType
     | ArrayValue  [Expression]
-    deriving (Show)
+    deriving (Show, Eq, Ord)
 
 instance Typeable HeapValue where
     typeOf (ObjectValue _ ty) = ty
