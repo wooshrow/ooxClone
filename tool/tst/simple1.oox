@@ -1,0 +1,176 @@
+class Item {
+    int x ;
+    Item(int y) {
+       this.x := y ;
+    }
+}
+
+// Just a test class containing a bunch of static methods to test against
+class SomeClass
+{
+    // valid
+    static int mOne(int x, int y)
+        requires(x > y)
+    {
+        if (x==y) assert false ;
+        if (x<y)  assert false ;
+        assert x>y ;
+        return x ;
+    }
+
+    // not valid
+    static int mOneInvalid(int x, int y)
+        requires(x > y)
+    {
+        if (x==y) assert false ;
+        if (x<y)  assert false ;
+        assert x<=y ; // error
+        return x ;
+    }
+
+    // valid
+    static void mTwo(int x, int y)
+        requires(x > y)
+    {
+        while(x>y) {
+           if(x<=y) { x := x+1 ; }
+           else     x := x-1 ;
+           assert x>=y ;
+        }
+        assert x==y ;
+    }
+
+    // invalid
+    static void mTwoInvalid(int x, int y)
+        requires(x > y)
+    {
+        while(x>y) {
+           if(x<=y) { x := x+1 ; }
+           else     x := x-1 ;
+           assert x>=y ;
+        }
+        assert x<y ; // error
+    }
+
+    // valid
+    static void mThree(int[] a, int x)
+        requires(a != null && #a > 0 && x<=0 && (forall elem, index : a : elem > 0))
+    {
+        int k := 0 ;
+        bool found := false ;
+        while (k < #a) {
+            int y := a[k] ;
+            if(y == x) found := true ;
+            k := k+1 ;
+        }
+        assert !found ;
+    }
+
+    // valid
+    static void mThreeInvalid(int[] a, int x)
+        requires(a != null && #a > 0 && x<=0 && (forall elem, index : a : elem > 0))
+    {
+        int k := 0 ;
+        bool found := false ;
+        while (k < #a) {
+            int y := a[k] ;
+            if(y == x) found := true ;
+            k := k+1 ;
+        }
+        if(k>3)
+          // error ; but setting the condition to k>3
+          // would require --symbolic-array-size 4 to be
+          // found
+        assert !found ;
+    }
+
+    // valid
+    static void mFour(int[] a, int[] b)
+        requires(a!=null && #a>1 && b!=null && #b>0)
+    {
+        int k := 1 ;
+        a[k] := 99 ;
+        if(a==b) {
+            int y := b[k] ;
+            assert y == 99 ;
+        }
+    }
+
+    // valid
+    static void mFourInvalid(int[] a, int[] b)
+        requires(a!=null && #a>1 && b!=null && #b>0)
+    {
+        int k := 1 ;
+        a[k] := 99 ;
+        if(#b>0) {
+            int y := b[k] ;
+            assert y == 99 ;
+        }
+    }
+
+    // valid
+    static void mFive(Item o, Item p)
+        requires(o!=null && p!=null)
+    {
+        int x := o.x ;
+        int y := p.x ;
+        if(o==p) {
+            assert x==y ;
+        }
+    }
+
+    // invalid
+    static void mFiveInvalid(Item o, Item p)
+        requires(o!=null && p!=null)
+    {
+        int x := o.x ;
+        int y := p.x ;
+        if(o==p) {
+            assert x==y ;
+        }
+        else {
+           assert x==y ; // error
+        }
+    }
+
+    // valid
+    static void mSix(Item o, Item p)
+        requires(o!=null && p!=null)
+    {
+        o.x := 99 ;
+        int y := p.x ;
+        if(o==p) {
+            assert y == 99 ;
+        }
+    }
+
+    // valid
+    static void mSeven(Item[] a)
+        requires(a!=null && #a>1 && (exists v,i: a : v!=null))
+    {
+        int k := 0 ;
+        while (k<#a) {
+           Item o := a[k] ;
+           if(o != null) {
+               o.x := 99 ;
+           }
+           k := k+1 ;
+        }
+        // collecting the values of o.x from o, to be inspected
+        // in the post-cond:
+        int[] values := new int[#a] ;
+        k := 0 ;
+        while (k<#a) {
+           values[k] := -1 ;
+           Item o := a[k] ;
+           if(o != null) {
+               int y := o.x ;
+               values[k] := y ;
+           }
+           k := k+1 ;
+        }
+        assert (exists v,i: values : v == 99) ;
+        // assert k < #a ;
+    }
+
+}

@@ -28,19 +28,19 @@ isEnabled state thread
     | (_, _, StatNode (Lock var _ _), _) <- thread ^. pc = do
         ref <- readDeclaration (state & currentThreadId ?~ (thread ^. tid)) var
         case ref of
-            Lit NullLit{} _ _ -> 
+            Lit NullLit{} _ _ ->
                 infeasible
-            SymbolicRef{} -> 
+            SymbolicRef{} ->
                 return True
-            Ref ref _ _ -> 
+            Ref ref _ _ ->
                 case LockSet.lookup ref (state ^. locks) of
                     Just tid' -> return (tid' == thread ^. tid)
                     Nothing   -> return True
-            _ -> 
+            _ ->
                 stop state (expectedReferenceErrorMessage ref)
-    | (_, _, StatNode (Join _ _), _) <- thread ^. pc = 
+    | (_, _, StatNode (Join _ _), _) <- thread ^. pc =
         S.null <$> children state (thread ^. tid)
-    | otherwise = 
+    | otherwise =
         return True
 
 children :: ExecutionState -> ThreadId -> Engine r (S.Set Thread)
@@ -56,53 +56,120 @@ por state0 threads = do
             return (state0, threads)
         else do
             let uniqueThreads = filter (isUniqueInterleaving state0) threads
-            measurePrunes (length threads - length uniqueThreads)
+            -- WP variant:
+            --
+            onlyDoLocals <-  filterM  (nextActionIsLocal state0) uniqueThreads
+            let uniqueThreads2 = if null onlyDoLocals then uniqueThreads else take 1 onlyDoLocals
+            -- measurePrunes (length threads - length uniqueThreads)
+            measurePrunes (length threads - length uniqueThreads2)
             state1 <- generate state0 threads
-            return (state1, uniqueThreads)
+            -- WP variant:
+            -- return (state1, uniqueThreads)
+            return (state1, uniqueThreads2)
 
+-- Check if a thread would be "unique" on the current state.
+-- A thread t is NOT unique if executing the next action of t
+-- would lead to a state that would have been, or will be
+-- explored through a different interleaved execution. if
+-- t cannot be determined as non-unique, then we call it unique.
+-- A thread that is unique will be explored (from the current
+-- state). Else there is no need to explore the thread (since
+-- its next action leads to a duplicate state anyway).
 isUniqueInterleaving :: ExecutionState -> Thread -> Bool
 isUniqueInterleaving state thread = do
     let trace       = state ^. programTrace
     let constraints = state ^. interleavingConstraints
-    not . any (isUnique trace) $ constraints
-    where
-        isUnique trace (IndependentConstraint previous current) = 
-            (thread ^. pc) == current && previous `elem` trace
-        isUnique _ NotIndependentConstraint{} = 
-            False
+    -- not . any (isUnique trace) $ constraints
+    all (relativeUnique trace) $ constraints
 
+    where
+        --isUnique trace (IndependentConstraint previous current) =
+        --    (thread ^. pc) == current && previous `elem` trace
+        --isUnique _ NotIndependentConstraint{} =
+        --    False
+        relativeUnique trace (IndependentConstraint previous current) =
+                not((thread ^. pc) == current && previous `elem` trace)
+        relativeUnique _ NotIndependentConstraint{} =
+                True
+
+-- given the current state s, its set of interleaving-constraints consists
+-- actuall of the constraints at the previous state s0 that leads to to
+-- the current state s. The function below calculates the new set of
+-- interleaving constraints on this s, and then updating this into s, to
+-- prepare it for the transition to the next state.
 generate :: GHC.HasCallStack => ExecutionState -> [Thread] -> Engine r ExecutionState
 generate state threads = do
+    -- generate the constraints for every pair of threads (x,y). Note that
+    -- the pair is ordered x<y. :
     let pairs = [(x, y) | let list = threads, x <- list, y <- list, x < y]
     new <- foldM construct [] pairs
     return $ updateInterleavingConstraints state new
-    where 
+    where
+        -- constructing the interleaving constraint for a given pair of
+        -- threads (t1,t2) ... the ordering is t1<t2.
         construct :: InterleavingConstraints -> (Thread, Thread) -> Engine r InterleavingConstraints
         construct acc pair@(thread1, thread2) = do
             isIndep <- isIndependent state pair
-            if isIndep 
+            if isIndep
                 then return (IndependentConstraint (thread1 ^. pc) (thread2 ^. pc) : acc)
                 else return (NotIndependentConstraint (thread1 ^. pc) (thread2 ^. pc) : acc)
+
 
 updateInterleavingConstraints :: ExecutionState -> InterleavingConstraints -> ExecutionState
 updateInterleavingConstraints state new = do
     let original = state ^. interleavingConstraints
-    let filtered = filter (isConflict new) original
+    -- let filtered = filter (isConflict new) original
+    -- renaming ... notConflicting is a better name :|
+    let filtered = filter (notConflicting new) original
+    -- in the update, we include all new constrainst + some of the old
+    -- constraints, if they do not conflict with the new ones:
     state & (interleavingConstraints .~ (filtered ++ new))
 
+{-
 isConflict :: [InterleavingConstraint] -> InterleavingConstraint -> Bool
 isConflict _   IndependentConstraint{}          = False
 isConflict new (NotIndependentConstraint x1 y1) = flip any new $ \case
     (IndependentConstraint x2 y2) -> S.fromList [x1, y1] `S.disjoint` S.fromList [x2, y2]
     NotIndependentConstraint{}    -> False
+-}
+
+-- renaming:
+-- Check if a given old constraint c would be non-conflicting with a set of
+-- new constraints.
+-- This seems to allow only non-independence constraints...
+--
+notConflicting :: [InterleavingConstraint] -> InterleavingConstraint -> Bool
+-- if c specifies dependency is considered as conflicing... so we drop it:
+notConflicting  _   IndependentConstraint{}          = False
+-- if c specifies non-dependency between threads x1 and y1; we keep it (it is
+-- non-conflicting) if either x1 or y1 appears in an Independence constraint in
+-- the new. ??? that does not make sense....
+notConflicting  new (NotIndependentConstraint x1 y1) = flip any new $ \case
+    (IndependentConstraint x2 y2) -> S.fromList [x1, y1] `S.disjoint` S.fromList [x2, y2]
+    NotIndependentConstraint{}    -> False
+
 
 type ReadWriteSet = (S.Set Reference, S.Set Reference)
+
+--
+-- WP variant
+-- check if a thread's first action only access local-vars:
+nextActionIsLocal :: GHC.HasCallStack => ExecutionState -> Thread -> Engine r Bool
+nextActionIsLocal state thread = do
+    (writes,rds) <- dependentOperationsOfT state thread
+    return (null writes && null rds)
+
 
 isIndependent :: GHC.HasCallStack => ExecutionState -> (Thread, Thread) -> Engine r Bool
 isIndependent state (thread1, thread2) = do
     (wT1, rT1) <- dependentOperationsOfT state thread1
     (wT2, rT2) <- dependentOperationsOfT state thread2
-    return $ S.disjoint wT1 wT2 && S.disjoint rT1 wT2 && S.disjoint rT2 wT1
+    -- WP variant, if thread1 only access local-vars and tr2 not, we will
+    -- declare t1,t2 (in that direction!) to be dependent:
+    -- return $ S.disjoint wT1 wT2 && S.disjoint rT1 wT2 && S.disjoint rT2 wT1
+    if null wT1 && null rT1 
+       then return False
+       else return $ S.disjoint wT1 wT2 && S.disjoint rT1 wT2 && S.disjoint rT2 wT1
 
 -- | Returns the reads and writes of the current thread.
 dependentOperationsOfT :: GHC.HasCallStack => ExecutionState -> Thread -> Engine r ReadWriteSet
@@ -110,7 +177,7 @@ dependentOperationsOfT state thread = dependentOperationsOfN state (thread ^. ti
 
 -- | Returns the reads and writes of the current program counter.
 dependentOperationsOfN :: GHC.HasCallStack => ExecutionState -> ThreadId -> CFGContext -> Engine r ReadWriteSet
-dependentOperationsOfN state tid (_, _, StatNode stat, _) 
+dependentOperationsOfN state tid (_, _, StatNode stat, _)
     = dependentOperationsOfS state tid stat
 dependentOperationsOfN _ _ _
     = return (S.empty, S.empty)
@@ -147,9 +214,9 @@ getReferences :: GHC.HasCallStack => ExecutionState -> ThreadId -> Identifier ->
 getReferences state tid var = do
     ref <- readDeclaration (state & currentThreadId ?~ tid) var
     case ref of
-        Lit NullLit{} _ _ -> 
+        Lit NullLit{} _ _ ->
             return S.empty
-        Ref{} -> 
+        Ref{} ->
             return $ S.singleton (ref ^?! SL.ref)
         SymbolicRef{}     ->
             case AliasMap.lookup (ref ^?! SL.var) (state ^. aliasMap) of

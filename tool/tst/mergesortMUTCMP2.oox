@@ -11,7 +11,7 @@ class Main {
     static void mergesort(int[] array, int left, int right)
         exceptional(false)
     {
-        if (left < right) {
+        if (left >= right) {  // error , should be <
             int middle := (left + right) / 2;
             fork Main.mergesort(array, left, middle);
             Main.mergesort(array, middle + 1, right);

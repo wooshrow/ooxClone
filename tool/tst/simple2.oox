@@ -1,0 +1,51 @@
+class Item {
+    int x ;
+    Item(int y) {
+       this.x := y ;
+    }
+}
+
+// Just a test class containing a bunch of static methods to test against
+class Main {
+
+    static void incr(Item o)
+    {
+         int x := o.x ;
+         int xinit := x ;
+         x := x+1 ;
+         o.x := x ;
+         x := o.x ;
+         assert x == xinit + 1 ;
+    }
+
+    static void mOne() {
+       Item o := new Item(0) ;
+       Item p := new Item(10) ;
+       fork Main.incr(o) ;
+       fork Main.incr(p) ;
+       join ;
+       int ox := o.x ;
+       int px := p.x ;
+       assert ox==1 && px==11 ;
+    }
+
+
+    static void zf(Item o) {
+        int k := 0 ;
+        while (k<2) {
+           k := k+1 ;
+           o.x :=  99 ;
+        }
+    }
+
+    static void mTwo() {
+       Item o := new Item(0) ;
+       fork Main.zf(o) ;
+       o.x := 1 ;
+       join ;
+       int x := o.x ;
+       assert x==1 ;
+    }
+
+
+}
