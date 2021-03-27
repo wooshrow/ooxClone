@@ -38,6 +38,9 @@ class Main {
       o.x := myx ;
    }
 
+   // Both original and new POR can handle this example. The assertion
+   // is also verified, implipying that the new POR does not drop
+   // critical interleavings.
    // valid
    static void testOne(int whatever) {
         Item o := new Item(whatever) ;
@@ -50,6 +53,10 @@ class Main {
         assert ox == px - 5 ;
    }
 
+   // A case where the original peep-hole POR would explode.
+   // The new POR scales up. The assertion is also verified,
+   // implipying that it does not drop critical interleavings.
+   //
    // valid
    static void testTwo(int whatever) {
         Item o := new Item(whatever) ;
@@ -69,6 +76,7 @@ class Main {
         assert px == qx && qx == rx ;
    }
 
+   // Notice that incrOneWithLoop uses a loop to increase o.x four times.
    // valid
    static void testThree(int whatever) {
         Item o := new Item(whatever) ;
@@ -96,7 +104,7 @@ class Main {
       assert myx > 0 ;
    }
 
-   // a case where the new POR still can't handle well. The method aLongLocalLoop()
+   // A case where the new POR still can't handle well. The method aLongLocalLoop()
    // generates a loop that only does local actions exceeding depth k = 100.
    // Because non-local actions will only be executed until the program can no
    // longer do any local-action, the assert in checkOne() above will never be
