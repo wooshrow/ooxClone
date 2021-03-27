@@ -1,0 +1,117 @@
+class Item {
+    int x ;
+    Item(int y) {
+       this.x := y ;
+    }
+}
+
+class Main {
+
+   static void incrOne(Item o){
+      int myx := o.x ;
+      // doing some local steps:
+      myx := myx + 1 ;
+      myx := myx + 1 ;
+      myx := myx + 1 ;
+      myx := myx + 1 ;
+      o.x := myx ;
+   }
+
+   static void incrOneWithLoop(Item o){
+      int myx := o.x ;
+      // doing some local steps:
+      int k := 0 ;
+      while (k<4) {
+        myx := myx + 1 ;
+        k := k+1 ;
+      }
+      o.x := myx ;
+   }
+
+   static void incrTwo(Item o) {
+      int myx := o.x ;
+      // doing some local steps:
+      myx := myx + 2 ;
+      myx := myx + 2 ;
+      myx := myx + 2 ;
+      myx := myx + 2 ;
+      o.x := myx ;
+   }
+
+   // valid
+   static void testOne(int whatever) {
+        Item o := new Item(whatever) ;
+        Item p := new Item(whatever + 1) ;
+        fork Main.incrOne(o) ;
+        fork Main.incrTwo(p) ;
+        join ;
+        int ox := o.x ;
+        int px := p.x ;
+        assert ox == px - 5 ;
+   }
+
+   // valid
+   static void testTwo(int whatever) {
+        Item o := new Item(whatever) ;
+        Item p := new Item(whatever + 1) ;
+        Item q := new Item(whatever + 1) ;
+        Item r := new Item(whatever + 1) ;
+        fork Main.incrOne(o) ;
+        fork Main.incrTwo(p) ;
+        fork Main.incrTwo(q) ;
+        fork Main.incrTwo(r) ;
+        join ;
+        int ox := o.x ;
+        int px := p.x ;
+        int qx := q.x ;
+        int rx := r.x ;
+        assert ox == px - 5 ;
+        assert px == qx && qx == rx ;
+   }
+
+   // valid
+   static void testThree(int whatever) {
+        Item o := new Item(whatever) ;
+        Item p := new Item(whatever + 1) ;
+        fork Main.incrOneWithLoop(o) ;
+        fork Main.incrTwo(p) ;
+        join ;
+        int ox := o.x ;
+        int px := p.x ;
+        assert ox == px - 5 ;
+   }
+
+   // adding a method that does a long loop that only does local actions
+   // The loop is deliberately made long, but it terminates.
+   static void aLongLocalLoop() {
+       int k := 0 ;
+       while (k<200) {
+           k := k + 1 ;
+           k := k + 1 ;
+       }
+   }
+
+   static void checkOne(Item o){
+      int myx := o.x ;
+      assert myx > 0 ;
+   }
+
+   // a case where the new POR still can't handle well. The method aLongLocalLoop()
+   // generates a loop that only does local actions exceeding depth k = 100.
+   // Because non-local actions will only be executed until the program can no
+   // longer do any local-action, the assert in checkOne() above will never be
+   // checked either.
+   static void testFour(int whatever) {
+        Item o := new Item(whatever) ;
+        Item p := new Item(whatever + 1) ;
+        fork Main.aLongLocalLoop() ;
+        fork Main.checkOne(o) ;
+        fork Main.checkOne(p) ;
+        join ;
+        int ox := o.x ;
+        int px := p.x ;
+        assert ox == px - 1 ;
+   }
+
+
+}
