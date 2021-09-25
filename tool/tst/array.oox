@@ -7,11 +7,11 @@ class Main
         a[0] := 1;
         int iValue := a[i];
         a[1] := iValue - 1;
-        
+
         int value := a[k];
         assert value >= 0;
     }
-    
+
     // A Bubblesort algorithm.
     static int[] sort(int[] array)
         requires(array != null)
@@ -35,7 +35,7 @@ class Main
         }
         return array;
     }
-    
+
     // Find the maximum element in the array.
     static int max(int[] array)
         requires(array != null)

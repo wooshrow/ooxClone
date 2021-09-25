@@ -3,6 +3,7 @@ module Execution.Semantics.PartialOrderReduction(
     , por
 ) where
 
+import Debug.Trace
 import qualified GHC.Stack as GHC
 import qualified Data.Set as S
 import           Control.Lens ((&), (^?!), (^.), (.~), (?~))
@@ -49,6 +50,7 @@ children state tid =
 
 por :: GHC.HasCallStack => ExecutionState -> [Thread] -> Engine r (ExecutionState, [Thread])
 por state0 []      = deadlock state0
+por state0 ts@[singleThread] = return (state0,ts)
 por state0 threads = do
     config <- askConfig
     if not (applyPOR config)
@@ -167,9 +169,14 @@ isIndependent state (thread1, thread2) = do
     -- WP variant, if thread1 only access local-vars and tr2 not, we will
     -- declare t1,t2 (in that direction!) to be dependent:
     -- return $ S.disjoint wT1 wT2 && S.disjoint rT1 wT2 && S.disjoint rT2 wT1
-    if null wT1 && null rT1 
+    if null wT1 && null rT1
        then return False
-       else return $ S.disjoint wT1 wT2 && S.disjoint rT1 wT2 && S.disjoint rT2 wT1
+       else if (S.member minBound wT1 && (not(null wT2) || not(null rT2)))
+                || (S.member minBound rT1 && not(null wT2))
+                || (S.member minBound wT2 && (not(null wT1) || not(null rT1)))
+                || (S.member minBound rT2 && not(null wT1))
+             then return False
+             else return $ S.disjoint wT1 wT2 && S.disjoint rT1 wT2 && S.disjoint rT2 wT1
 
 -- | Returns the reads and writes of the current thread.
 dependentOperationsOfT :: GHC.HasCallStack => ExecutionState -> Thread -> Engine r ReadWriteSet
@@ -221,6 +228,7 @@ getReferences state tid var = do
         SymbolicRef{}     ->
             case AliasMap.lookup (ref ^?! SL.var) (state ^. aliasMap) of
                 Just aliases -> return . S.map (^?! SL.ref) . S.filter (/= lit' nullLit') $ aliases
-                Nothing      -> stop state noAliasesErrorMessage
+                Nothing      -> return $ S.singleton minBound
+                                -- stop state (trace (">>> " ++ show var) noAliasesErrorMessage)
         _ ->
             stop state (expectedReferenceErrorMessage ref)

@@ -44,7 +44,7 @@ execute table cfg = do
                 Right _  -> return Valid
         _        -> throw (unknownEntryPointError entryPoint)
 
-test :: Members [State Statistics, Trace, Embed IO] r => 
+test :: Members [State Statistics, Trace, Embed IO] r =>
     Configuration -> ControlFlowGraph -> SymbolTable -> DeclarationMember -> Sem r (Either VerificationResult [ExecutionState])
 test config cfg table method = runError (runNonDet (evalCache (runReader (config, cfg, table) (start emptyState method))))
 
@@ -65,14 +65,23 @@ start state0 initialMethod = do
         arguments            = map createArgument (initialMethod ^?! SL.params)
         createArgument param = createSymbolicVar (param ^?! SL.name) (param ^?! SL.ty)
 
+{- WP does not work...
+foo :: ExecutionState -> [Expression] -> Engine r ExecutionState
+foo state [] = return state
+foo state (v:others) = do
+    state2 <- initializeSymbolicRef state v
+    state3 <- foo state2 others
+    return state3
+-}
+
 --------------------------------------------------------------------------------
--- Process Execution 
+-- Process Execution
 
 -- | Symbolically executes the program.
 execP :: GHC.HasCallStack => ExecutionState -> Engine r ExecutionState
 execP state0 = do
     let allThreads = state0 ^. threads
-    if null allThreads 
+    if null allThreads
         then finish state0
         else do
             measureBranches allThreads
@@ -83,7 +92,7 @@ execP state0 = do
                 then do
                     shuffledThreads <- embed (shuffleM threads)
                     branch' (\ thread -> execT (state1 & (currentThreadId ?~ (thread ^. tid))) (thread ^. pc)) shuffledThreads
-                else 
+                else
                     branch' (\ thread -> execT (state1 & (currentThreadId ?~ (thread ^. tid))) (thread ^. pc)) threads
 
 --------------------------------------------------------------------------------
@@ -118,7 +127,7 @@ execT state0 (_, _, MemberExit{}, neighbours) =
 -- A Try Entry
 execT state0 (_, _, TryEntry handler, neighbours) = do
     state1 <- execTryEntry state0 handler
-    branch (step state1) neighbours 
+    branch (step state1) neighbours
 
 -- A Try Exit
 execT state0 (_, _, TryExit, neighbours) = do
@@ -181,7 +190,7 @@ execT state0 (_, _, StatNode (Unlock var _ _), neighbours) = do
 execT state0 (_, _, StatNode (Fork invocation _ _), neighbours) = do
     let method    = fromJust (invocation ^. SL.resolved) ^. _2
     -- TODO: the next line does not work for constructors.
-    let arguments = invocation ^. SL.arguments 
+    let arguments = invocation ^. SL.arguments
     (state1, _) <- execFork state0 method arguments
     branch (step state1) neighbours
 
@@ -202,12 +211,12 @@ stepM state0 neighbour
         finish state0
 
 updatePC :: ExecutionState -> Maybe ((), Node) -> Engine r ExecutionState
-updatePC state Nothing = 
+updatePC state Nothing =
     return state
 updatePC state (Just (_, node)) = do
     cfg <- askCFG
     case getCurrentThread state of
-        Nothing      -> 
+        Nothing      ->
             return state
         Just thread0 -> do
             debug ("Updating pc to '" ++ show node ++ "'")
