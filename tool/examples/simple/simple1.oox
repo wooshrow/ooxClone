@@ -77,11 +77,12 @@ class SomeClass
             if(y == x) found := true ;
             k := k+1 ;
         }
-        if(k>3)
+        assert false ;
+        if(k>4)
           // error ; but setting the condition to k>3
           // would require --symbolic-array-size 4 to be
           // found
-        assert !found ;
+          assert found ;
     }
 
     // valid
