@@ -10,7 +10,7 @@ maintainer:             stefan.koppier@outlook.com
 category:               Testing
 extra-source-files:     CHANGELOG.md
 
-executable app
+executable ooxvy
     other-modules:          Language.Syntax
                           , Language.Syntax.Lenses
                           , Language.Syntax.Fold
@@ -100,3 +100,4 @@ executable app
     ghc-options:            -Wall
                             -fplugin=Polysemy.Plugin
                             -O2
+                            -j4

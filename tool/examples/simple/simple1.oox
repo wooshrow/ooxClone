@@ -1,3 +1,7 @@
+//
+// Just a test class containing a bunch of static methods to test against
+//
+
 class Item {
     int x ;
     Item(int y) {
@@ -5,7 +9,6 @@ class Item {
     }
 }
 
-// Just a test class containing a bunch of static methods to test against
 class SomeClass
 {
     // valid

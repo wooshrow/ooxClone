@@ -1,0 +1,161 @@
+//
+// Containing some test programs exposing multi-threads executions
+//
+
+class Item {
+    int x ;
+    Item(int y) {
+       this.x := y ;
+    }
+}
+
+class Main {
+
+    static void incr(Item o)
+    {
+         int x := o.x ;
+         int xinit := x ;
+         x := x+1 ;
+         o.x := x ;
+         x := o.x ;
+         assert x == xinit + 1 ;
+    }
+
+    static void incrInvalid(Item o)
+    {
+         int x := o.x ;
+         int xinit := x ;
+         x := x+1 ;
+         o.x := x ;
+         x := o.x ;
+         assert x == xinit ;
+    }
+
+    static void zf(Item o)
+        requires(o != null)
+    {
+        int k := 0 ;
+        while (k<2) {
+           k := k+1 ;
+           o.x :=  99 ;
+        }
+    }
+
+    static void mOne() {
+       Item o := new Item(0) ;
+       Item p := new Item(10) ;
+       fork Main.incr(o) ;
+       fork Main.incr(p) ;
+       join ;
+       int ox := o.x ;
+       int px := p.x ;
+       assert ox==1 && px==11 ;
+    }
+
+    static void mOneInvalidOne() {
+       Item o := new Item(0) ;
+       Item p := new Item(10) ;
+       fork Main.incr(o) ;
+       fork Main.incr(p) ;
+       join ;
+       int ox := o.x ;
+       int px := p.x ;
+       assert ox!=1 ;
+    }
+
+    static void mOneInvalidTwo() {
+       Item o := new Item(0) ;
+       Item p := new Item(10) ;
+       fork Main.incr(o) ;
+       fork Main.incr(p) ;
+       join ;
+       int ox := o.x ;
+       int px := p.x ;
+       assert px!=11 ;
+    }
+
+    static void mTwo() {
+       Item o := new Item(0) ;
+       fork Main.zf(o) ;
+       o.x := 1 ;
+       join ;
+       int x := o.x ;
+       assert x==1 || x==99 ;
+    }
+
+    static void mTwoInvalidOne() {
+       Item o := new Item(0) ;
+       fork Main.zf(o) ;
+       o.x := 1 ;
+       join ;
+       int x := o.x ;
+       assert x==1  ;
+    }
+
+    static void mTwoInvalidTwo() {
+       Item o := new Item(0) ;
+       fork Main.zf(o) ;
+       o.x := 1 ;
+       join ;
+       int x := o.x ;
+       assert x==99  ;
+    }
+
+    static void mThree() {
+       int k := 0 ;
+       int N := 4 ;
+       Item[] items := new Item[N] ;
+       while (k<N) {
+           Item o := new Item(k) ;
+           items[k] := o ;
+           fork Main.incr(o) ;
+           //Main.incr(o) ;
+           k := k+1 ;
+       }
+       join ;
+       k := 0 ;
+       while (k<N) {
+          Item o := items[k] ;
+          int y := o.x ;
+          assert y == k+1 ;
+          k := k+1 ;
+       }
+    }
+
+    static void mThreeInvalidOne() {
+       int k := 0 ;
+       int N := 4 ;
+       Item[] items := new Item[N] ;
+       while (k<N) {
+           Item o := new Item(k) ;
+           items[k] := o ;
+           fork Main.incr(o) ;
+           //Main.incr(o) ;
+           k := k+1 ;
+       }
+       join ;
+       k := 0 ;
+       Item o := items[0] ;
+       int y := o.x ;
+       assert y == 0 ; // should be 1
+    }
+
+    static void mThreeInvalidTwo() {
+       int k := 0 ;
+       int N := 4 ;
+       Item[] items := new Item[N] ;
+       while (k<N) {
+           Item o := new Item(k) ;
+           items[k] := o ;
+           fork Main.incr(o) ;
+           //Main.incr(o) ;
+           k := k+1 ;
+       }
+       join ;
+       k := 0 ;
+       Item o := items[N-1] ;
+       int y := o.x ;
+       assert y == N-1 ; // should be N
+    }
+
+}
