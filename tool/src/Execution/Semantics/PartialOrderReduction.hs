@@ -58,17 +58,21 @@ por state0 threads = do
         then
             return (state0, threads)
         else do
-            --onlyDoLocals <-  filterM  (nextActionIsLocal state0) threads
+            onlyDoLocals <-  filterM  (nextActionIsLocal state0) threads
             -- calculate the interleaving constraints on the current state:
-            state1_ <- generate state0 threads
+            let remainingThreads = filter (\t-> not (t `elem` onlyDoLocals)) threads
+            --state1_ <- generate state0 threads
+            state1_ <- generate state0 remainingThreads
             let currentConstraints = state1_ ^. interleavingConstraints
-            let uniqueThreads = filter (not . isRedundant state0 currentConstraints) threads
-            -- let uniqueThreads2 = if null onlyDoLocals then uniqueThreads else take 1 onlyDoLocals
-            let uniqueThreads2 = uniqueThreads
+            --let uniqueThreads = filter (not . isRedundant state0 currentConstraints) threads
+            let uniqueThreads = filter (not . isRedundant state0 currentConstraints) remainingThreads
+            let uniqueThreads2 = if null onlyDoLocals then uniqueThreads else take 1 onlyDoLocals
+            -- let uniqueThreads2 = uniqueThreads
             -- measurePrunes (length threads - length uniqueThreads)
             measurePrunes (length threads - length uniqueThreads2)
             -- state1 <- generate state0 threads
-            return (state1_ , uniqueThreads2)
+            let state1__ = if null onlyDoLocals then state1_ else state0
+            return (state1__ , uniqueThreads2)
 
 {-
    Check if executing the given thread would be redundant (and hence
@@ -103,18 +107,20 @@ por state0 threads = do
 isRedundant :: ExecutionState -> InterleavingConstraints -> Thread -> Bool
 isRedundant state currentConstraints thread =
     -- case-1:
-    if any (\case IndependentConstraint b c -> fst c `isLastStepOf` executiontrace)
+    if any (\case IndependentConstraint b c -> fst b == myTid && fst c `isLastStepOf` executiontrace)
          relevantIndependentPreviousConstraints
     then True
-    else if redundant2
-         -- then trace ("\n>>> droping th-" ++ show (_tid thread)) redundant2
-         then redundant2
-         else redundant2
+    else False {-
+         WP note: ok, so this idea of redundant2 is unsound.
+         if redundant2
+         then trace ("\n>>> droping th-" ++ show (_tid thread)) redundant2
+         -- then redundant2
+         else redundant2 -}
 
     where
         redundant2 = null relevantDependentCurrentConstraints
-                     -- && any (\case IndependentConstraint a b -> if fst b == myTid then trace ("\n=== indep " ++ show_ a ++ "\n   vs " ++ show_ b ++ "\n   same pair??" ++ show (fst a== fst b)) True else False)
-                     && any (\case IndependentConstraint a b -> fst b == myTid )
+                     && any (\case IndependentConstraint a b -> if fst b == myTid then trace ("\n=== indep " ++ show_ a ++ "\n   vs " ++ show_ b ++ "\n   same pair??" ++ show (fst a== fst b)) True else False)
+                     -- && any (\case IndependentConstraint a b -> fst b == myTid )
                         relevantIndependentCurrentConstraints
 
         -- show_ v = show (pretty v)
@@ -224,16 +230,15 @@ isIndependent state (thread1, thread2) = do
     -- WP variant, if thread1 only access local-vars and tr2 not, we will
     -- declare t1,t2 (in that direction!) to be dependent:
     return $ S.disjoint wT1 wT2 && S.disjoint rT1 wT2 && S.disjoint rT2 wT1
-    {-
-    if (null wT1 && null rT1) || (null wT2 && null rT2)
+    {- if (null wT1 && null rT1) || (null wT2 && null rT2)
        then return False
        else if (S.member minBound wT1 && (not(null wT2) || not(null rT2)))
                 || (S.member minBound rT1 && not(null wT2))
                 || (S.member minBound wT2 && (not(null wT1) || not(null rT1)))
                 || (S.member minBound rT2 && not(null wT1))
             then return False
-            else return $ S.disjoint wT1 wT2 && S.disjoint rT1 wT2 && S.disjoint rT2 wT1
-            -}
+            else return $ S.disjoint wT1 wT2 && S.disjoint rT1 wT2 && S.disjoint rT2 wT1 -}
+
 
 
 -- | Returns the reads and writes of the current thread.

@@ -31,7 +31,7 @@ class Main {
          assert x == xinit ;
     }
 
-    static void zf(Item o, int z)
+    static void zf(Item o, int z) // set o.x to z
         requires(o != null)
     {
         int k := 0 ;
@@ -109,7 +109,7 @@ class Main {
 
     static void mThree(int a) {
        int k := 0 ;
-       int N := 5 ;
+       int N := 4 ;
        Item[] items := new Item[N] ;
        while (k<N) {
            Item o := new Item(a+k) ;

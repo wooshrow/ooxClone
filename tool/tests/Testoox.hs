@@ -94,15 +94,18 @@ tsuite_concursimple1 = TestList [
    testOOX_concur concursimpel1_oox "Main.mTwoInvalidOne" expectInvalid 100,
    testOOX_concur concursimpel1_oox "Main.mTwoInvalidTwo" expectInvalid 100,
    testOOX_concur concursimpel1_oox "Main.mThree" expectValid 200,
-   testOOX_concur concursimpel1_oox "Main.mThreeInvalidOne" expectInvalid 200,
+   testOOX_concur concursimpel1_oox "Main.mThreeInvalidOne" expectInvalid 300,
    testOOX_concur concursimpel1_oox "Main.mThreeInvalidTwo" expectInvalid 200
    ]
 
 tsuitex = TestList [
        testOOX_concur concursimpel1_oox "Main.mThree" expectValid 150
-       -- testOOX_concur concursimpel1_oox "Main.mOneInvalidTwo" expectInvalid 100
-       --testOOX_concur concursimpel1_oox "Main.mThreeInvalidOne" expectInvalid 300
-       -- testOOX_concur concursimpel1_oox "Main.mThreeInvalidTwo" expectInvalid 300
+       --testOOX_concur concursimpel1_oox "Main.mOneInvalidTwo" expectInvalid 100,
+       --testOOX_concur concursimpel1_oox "Main.mTwoInvalidOne" expectInvalid 100,
+       --testOOX_concur concursimpel1_oox "Main.mTwoInvalidTwo" expectInvalid 100,
+       --testOOX_concur concursimpel1_oox "Main.mThreeInvalidOne" expectInvalid 300,
+       --testOOX_concur concursimpel1_oox "Main.mThreeInvalidOne" expectInvalid 300,
+       --testOOX_concur concursimpel1_oox "Main.mThreeInvalidTwo" expectInvalid 300
       ]
 
 -- invoke this to run all test suites:

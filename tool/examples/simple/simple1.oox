@@ -1,5 +1,5 @@
 //
-// Just a test class containing a bunch of static methods to test against
+// A test class containing a bunch of static methods to test against.
 //
 
 class Item {
