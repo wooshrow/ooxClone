@@ -31,82 +31,88 @@ class Main {
          assert x == xinit ;
     }
 
-    static void zf(Item o)
+    static void zf(Item o, int z)
         requires(o != null)
     {
         int k := 0 ;
         while (k<2) {
            k := k+1 ;
-           o.x :=  99 ;
+           o.x :=  z ;
         }
     }
 
-    static void mOne() {
-       Item o := new Item(0) ;
-       Item p := new Item(10) ;
+    static void mOne(int a) {
+       Item o := new Item(a) ;
+       Item p := new Item(a + 10) ;
        fork Main.incr(o) ;
        fork Main.incr(p) ;
        join ;
        int ox := o.x ;
        int px := p.x ;
-       assert ox==1 && px==11 ;
+       assert ox==a+1 && px==a+11 ;
     }
 
-    static void mOneInvalidOne() {
-       Item o := new Item(0) ;
-       Item p := new Item(10) ;
+    static void mOneInvalidOne(int a) {
+       Item o := new Item(a) ;
+       Item p := new Item(a+10) ;
        fork Main.incr(o) ;
        fork Main.incr(p) ;
        join ;
        int ox := o.x ;
        int px := p.x ;
-       assert ox!=1 ;
+       assert ox!=a+1 ;
     }
 
-    static void mOneInvalidTwo() {
-       Item o := new Item(0) ;
-       Item p := new Item(10) ;
+    static void mOneInvalidTwo(int a) {
+       Item o := new Item(a) ;
+       Item p := new Item(a+10) ;
        fork Main.incr(o) ;
        fork Main.incr(p) ;
        join ;
        int ox := o.x ;
        int px := p.x ;
-       assert px!=11 ;
+       assert px!=a+11 ;
     }
 
-    static void mTwo() {
-       Item o := new Item(0) ;
-       fork Main.zf(o) ;
-       o.x := 1 ;
+    static void mTwo(int y, int z)
+      requires(y>=0 && y<z)
+    {
+       Item o := new Item(y) ;
+       fork Main.zf(o,z) ;
+       o.x := y+1 ;
        join ;
        int x := o.x ;
-       assert x==1 || x==99 ;
+       assert x==y+1 || x==z ;
     }
 
-    static void mTwoInvalidOne() {
-       Item o := new Item(0) ;
-       fork Main.zf(o) ;
-       o.x := 1 ;
+    static void mTwoInvalidOne(int y, int z)
+       requires(y>=0 && y<z)
+    {
+       Item o := new Item(y) ;
+       fork Main.zf(o,z) ;
+       o.x := y+1 ;
        join ;
        int x := o.x ;
-       assert x==1  ;
+       assert x==y+1  ;
     }
 
-    static void mTwoInvalidTwo() {
-       Item o := new Item(0) ;
-       fork Main.zf(o) ;
-       o.x := 1 ;
+    static void mTwoInvalidTwo(int y, int z)
+       requires(y>=0 && y<z)
+    {
+       Item o := new Item(y) ;
+       fork Main.zf(o,z) ;
+       o.x := y+1 ;
        join ;
        int x := o.x ;
-       assert x==99  ;
+       assert x==z  ;
     }
 
-    static void mThree() {
+    static void mThree(int a) {
        int k := 0 ;
-       int N := 4 ;
+       int N := 5 ;
        Item[] items := new Item[N] ;
        while (k<N) {
-           Item o := new Item(k) ;
+           Item o := new Item(a+k) ;
            items[k] := o ;
            fork Main.incr(o) ;
            //Main.incr(o) ;
@@ -117,17 +123,34 @@ class Main {
        while (k<N) {
           Item o := items[k] ;
           int y := o.x ;
-          assert y == k+1 ;
+          assert y == a+k+1 ;
           k := k+1 ;
        }
     }
 
-    static void mThreeInvalidOne() {
+    static void mThreeInvalidOne(int a) {
+       int k := 0 ;
+       int N := 6 ;
+       Item[] items := new Item[N] ;
+       while (k<N) {
+           Item o := new Item(a+k) ;
+           items[k] := o ;
+           fork Main.incr(o) ;
+           //Main.incr(o) ;
+           k := k+1 ;
+       }
+       join ;
+       Item o := items[0] ;
+       int y := o.x ;
+       assert y == a ; // should be a+1
+    }
+
+    static void mThreeInvalidTwo(int a) {
        int k := 0 ;
        int N := 4 ;
        Item[] items := new Item[N] ;
        while (k<N) {
-           Item o := new Item(k) ;
+           Item o := new Item(a+k) ;
            items[k] := o ;
            fork Main.incr(o) ;
            //Main.incr(o) ;
@@ -135,14 +158,16 @@ class Main {
        }
        join ;
        k := 0 ;
-       Item o := items[0] ;
+       Item o := items[N-1] ;
        int y := o.x ;
-       assert y == 0 ; // should be 1
+       assert y == N ; // should be N+a
     }
 
-    static void mThreeInvalidTwo() {
+    static void mFourInvalid(int N)
+        requires(N==2)
+    {
        int k := 0 ;
-       int N := 4 ;
+       N := 3 ;
        Item[] items := new Item[N] ;
        while (k<N) {
            Item o := new Item(k) ;

@@ -221,7 +221,7 @@ updatePC state (Just (_, node)) = do
         Just thread0 -> do
             debug ("Updating pc to '" ++ show node ++ "'")
             let thread1 = thread0 & (pc .~ context cfg node)
-            return $ updateThreadInState state thread1 & (programTrace %~ ((thread0 ^. pc) :))
+            return $ updateThreadInState state thread1 & (programTrace %~ ((_tid thread0, thread0 ^. pc) :))
 
 --------------------------------------------------------------------------------
 -- Brancing functions

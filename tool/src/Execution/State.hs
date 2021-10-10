@@ -1,5 +1,5 @@
 module Execution.State where
-    
+
 import           Prelude hiding ((<>))
 import qualified Data.Set                 as S
 import           Data.Foldable
@@ -25,7 +25,7 @@ data ExecutionState = ExecutionState
     , _locks                   :: !LockSet
     , _numberOfForks           :: !Int
     , _interleavingConstraints :: !InterleavingConstraints
-    , _programTrace            :: ![CFGContext]
+    , _programTrace            :: ![(ThreadId,CFGContext)]
     , _remainingK              :: !Int }
     deriving (Show)
 
@@ -56,13 +56,13 @@ updateThreadInState :: ExecutionState -> Thread -> ExecutionState
 updateThreadInState state thread = state & (threads %~ S.insert thread)
 
 defaultValue :: Typeable a => a -> Expression
-defaultValue ty = lit' $ 
+defaultValue ty = lit' $
     case typeOf ty of
         UIntRuntimeType   -> uIntLit'  0   ; IntRuntimeType         -> intLit'  0
         FloatRuntimeType  -> floatLit' 0.0 ; BoolRuntimeType        -> boolLit' False
         CharRuntimeType   -> charLit'  "\0"; ReferenceRuntimeType{} -> nullLit'
         ARRAYRuntimeType  -> nullLit'      ; ArrayRuntimeType{}     -> nullLit'
-        StringRuntimeType -> nullLit'      
+        StringRuntimeType -> nullLit'
 
 getThread :: ExecutionState -> ThreadId -> Maybe Thread
 getThread state tid' = find (\ thread -> thread ^. tid == tid') (state ^. threads)
@@ -71,4 +71,3 @@ getCurrentThread :: ExecutionState -> Maybe Thread
 getCurrentThread state = do
     currentTid <- state ^. currentThreadId
     getThread state currentTid
-

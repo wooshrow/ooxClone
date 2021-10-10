@@ -3,7 +3,7 @@ module Execution.State.Thread(
     , StackFrame(StackFrame)
     , returnPoint, target, declarations, currentMember
     , Thread(Thread)
-    , tid, parent, _pc, pc, callStack, handlerStack
+    , tid, _tid, parent, _pc, pc, callStack, handlerStack
     , processTid
 ) where
 
@@ -14,13 +14,13 @@ import           Control.Lens               (makeLenses, (^.))
 import           Analysis.CFA.CFG
 import           Language.Syntax
 
-newtype ThreadId = ThreadId { unThreadId :: Int }
+newtype ThreadId = ThreadId { unThreadId :: Int } 
 
 processTid :: ThreadId
 processTid = ThreadId (-1)
 
 instance Show ThreadId where
-    show tid@(ThreadId value) 
+    show tid@(ThreadId value)
         | tid == processTid = "none"
         | otherwise         = show value
 
@@ -31,7 +31,7 @@ instance Pretty.Pretty ThreadId where
 
 instance Eq ThreadId where
     (ThreadId a) == (ThreadId b) = a == b
-    
+
 instance Ord ThreadId where
     (ThreadId a) <= (ThreadId b) = a <= b
 
@@ -45,12 +45,12 @@ data StackFrame = StackFrame
 $(makeLenses ''StackFrame)
 
 instance Pretty.Pretty StackFrame where
-    pretty frame = 
+    pretty frame =
         Pretty.text "returnPoint="  <> Pretty.pretty (frame ^. returnPoint)  Pretty.$+$
         Pretty.text "target="       <> Pretty.pretty (frame ^. target)       Pretty.$+$
         Pretty.text "declarations=" <> Pretty.pretty (frame ^. declarations)
 
-data Thread = Thread 
+data Thread = Thread
     { _tid          :: ThreadId
     , _parent       :: ThreadId
     , _pc           :: CFGContext
@@ -61,13 +61,13 @@ data Thread = Thread
 $(makeLenses ''Thread)
 
 instance Eq Thread where
-    t1 == t2 = t1 ^. tid == t2 ^. tid  
+    t1 == t2 = t1 ^. tid == t2 ^. tid
 
 instance Ord Thread where
     t1 <= t2 = t1 ^. tid <= t2 ^. tid
 
 instance Pretty.Pretty Thread where
-    pretty thread = 
+    pretty thread =
         Pretty.text "tid="       <> Pretty.pretty (thread ^. tid)       Pretty.$+$
         Pretty.text "parent="    <> Pretty.pretty (thread ^. parent)    Pretty.$+$
         Pretty.text "pc="        <> Pretty.pretty (thread ^. pc)        Pretty.$+$

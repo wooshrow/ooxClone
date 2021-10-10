@@ -23,6 +23,7 @@ import           Language.Syntax
 import           Language.Syntax.Fold
 import           Language.Syntax.DSL
 import qualified Language.Syntax.Lenses as SL
+import           Text.Pretty
 
 isEnabled :: GHC.HasCallStack => ExecutionState -> Thread -> Engine r Bool
 isEnabled state thread
@@ -57,42 +58,92 @@ por state0 threads = do
         then
             return (state0, threads)
         else do
-            let uniqueThreads = filter (isUniqueInterleaving state0) threads
-            -- WP variant:
-            --
-            onlyDoLocals <-  filterM  (nextActionIsLocal state0) uniqueThreads
-            let uniqueThreads2 = if null onlyDoLocals then uniqueThreads else take 1 onlyDoLocals
+            --onlyDoLocals <-  filterM  (nextActionIsLocal state0) threads
+            -- calculate the interleaving constraints on the current state:
+            state1_ <- generate state0 threads
+            let currentConstraints = state1_ ^. interleavingConstraints
+            let uniqueThreads = filter (not . isRedundant state0 currentConstraints) threads
+            -- let uniqueThreads2 = if null onlyDoLocals then uniqueThreads else take 1 onlyDoLocals
+            let uniqueThreads2 = uniqueThreads
             -- measurePrunes (length threads - length uniqueThreads)
             measurePrunes (length threads - length uniqueThreads2)
-            state1 <- generate state0 threads
-            -- WP variant:
-            -- return (state1, uniqueThreads)
-            return (state1, uniqueThreads2)
+            -- state1 <- generate state0 threads
+            return (state1_ , uniqueThreads2)
 
--- Check if a thread would be "unique" on the current state.
--- A thread t is NOT unique if executing the next action of t
--- would lead to a state that would have been, or will be
--- explored through a different interleaved execution. if
--- t cannot be determined as non-unique, then we call it unique.
--- A thread that is unique will be explored (from the current
--- state). Else there is no need to explore the thread (since
--- its next action leads to a duplicate state anyway).
-isUniqueInterleaving :: ExecutionState -> Thread -> Bool
-isUniqueInterleaving state thread = do
-    let trace       = state ^. programTrace
-    let constraints = state ^. interleavingConstraints
-    -- not . any (isUnique trace) $ constraints
-    all (relativeUnique trace) $ constraints
+{-
+   Check if executing the given thread would be redundant (and hence
+   we can afford not to execute it).
+   Let tx be the thread under consideration, and let b be the next primitive
+   action to execution in tx.
+   Let s be the current state under consideration.
+
+   There are two cases where tx is redundant.
+
+   Case-1. We have a previous state, let's call it s0, and let IC0 be
+   the set of all interleaving constraints in that previous state s0.
+
+   If (1) there exists a constraint b~c in IC0 (b and some c are independent),
+   and (2) b<c, and (3) c was executed last (so, in the transition from s0
+   to the current state under consideration). This would imply that the sequence
+   b;c was or will be tried on the state s0, which would lead to the same state
+   as b on the current state s (or in other words, on c;b on s0). Since executing
+   b (of tx) leads to a duplicated state, tx is thus redundant.
+
+   Else, we have Case-2. Let IC be the set of all interleaving constraints on
+   the current state s.
+
+   If (1) there is NO constraints b!~c in IC (b and c are dependent), and
+   (2) for all constraints a~b in IC we have a<b. Condition-1 implies that
+   there is no currently enabled thread whose behavior depends specifically on
+   what b does on s. Condition-2 implies that a;b will be tried on the state s,
+   so b will get its turn. It will be tried on the state s--a-->s', but since
+   b does not depend on what a does on s, we can try it on s' without changing
+   its effect.
+-}
+isRedundant :: ExecutionState -> InterleavingConstraints -> Thread -> Bool
+isRedundant state currentConstraints thread =
+    -- case-1:
+    if any (\case IndependentConstraint b c -> fst c `isLastStepOf` executiontrace)
+         relevantIndependentPreviousConstraints
+    then True
+    else if redundant2
+         -- then trace ("\n>>> droping th-" ++ show (_tid thread)) redundant2
+         then redundant2
+         else redundant2
 
     where
-        --isUnique trace (IndependentConstraint previous current) =
-        --    (thread ^. pc) == current && previous `elem` trace
-        --isUnique _ NotIndependentConstraint{} =
-        --    False
-        relativeUnique trace (IndependentConstraint previous current) =
-                not((thread ^. pc) == current && previous `elem` trace)
-        relativeUnique _ NotIndependentConstraint{} =
-                True
+        redundant2 = null relevantDependentCurrentConstraints
+                     -- && any (\case IndependentConstraint a b -> if fst b == myTid then trace ("\n=== indep " ++ show_ a ++ "\n   vs " ++ show_ b ++ "\n   same pair??" ++ show (fst a== fst b)) True else False)
+                     && any (\case IndependentConstraint a b -> fst b == myTid )
+                        relevantIndependentCurrentConstraints
+
+        -- show_ v = show (pretty v)
+        show_ cfgContext@(tid,(_,_,nodevalue,_)) = show tid ++ ":" ++ show (pretty nodevalue)
+
+        myTid = _tid thread
+        currentStmt = (thread ^. pc)
+        prevConstraints = state ^. interleavingConstraints
+
+        relevantIndependentPreviousConstraints = filter p prevConstraints
+           where
+           p (IndependentConstraint a b) = fst a == myTid || fst b == myTid
+           p _ = False
+
+        -- constraints that have anything to do with the current thread:
+        relevantDependentCurrentConstraints = filter p currentConstraints
+           where
+           p (NotIndependentConstraint a b) = fst a == myTid || fst b == myTid
+           p _ = False
+
+        relevantIndependentCurrentConstraints = filter p currentConstraints
+           where
+           p (IndependentConstraint a b) = fst a == myTid || fst b == myTid
+           p _ = False
+
+        executiontrace   = map fst (state ^. programTrace)
+
+        isLastStepOf a [] = False
+        isLastStepOf a (b:_) = a==b
 
 -- given the current state s, its set of interleaving-constraints consists
 -- actuall of the constraints at the previous state s0 that leads to to
@@ -105,16 +156,20 @@ generate state threads = do
     -- the pair is ordered x<y. :
     let pairs = [(x, y) | let list = threads, x <- list, y <- list, x < y]
     new <- foldM construct [] pairs
-    return $ updateInterleavingConstraints state new
+    -- WP update 2; we drop all existing constraints and just put the new ones:
+    -- return $ updateInterleavingConstraints state new
+    return (state & (interleavingConstraints .~ new))
     where
         -- constructing the interleaving constraint for a given pair of
         -- threads (t1,t2) ... the ordering is t1<t2.
         construct :: InterleavingConstraints -> (Thread, Thread) -> Engine r InterleavingConstraints
         construct acc pair@(thread1, thread2) = do
             isIndep <- isIndependent state pair
+            let t1 = _tid thread1
+            let t2 = _tid thread2
             if isIndep
-                then return (IndependentConstraint (thread1 ^. pc) (thread2 ^. pc) : acc)
-                else return (NotIndependentConstraint (thread1 ^. pc) (thread2 ^. pc) : acc)
+                then return (IndependentConstraint (t1, thread1 ^. pc) (t2, thread2 ^. pc) : acc)
+                else return (NotIndependentConstraint (t1, thread1 ^. pc) (t2, thread2 ^. pc) : acc)
 
 
 updateInterleavingConstraints :: ExecutionState -> InterleavingConstraints -> ExecutionState
@@ -168,15 +223,18 @@ isIndependent state (thread1, thread2) = do
     (wT2, rT2) <- dependentOperationsOfT state thread2
     -- WP variant, if thread1 only access local-vars and tr2 not, we will
     -- declare t1,t2 (in that direction!) to be dependent:
-    -- return $ S.disjoint wT1 wT2 && S.disjoint rT1 wT2 && S.disjoint rT2 wT1
-    if null wT1 && null rT1
+    return $ S.disjoint wT1 wT2 && S.disjoint rT1 wT2 && S.disjoint rT2 wT1
+    {-
+    if (null wT1 && null rT1) || (null wT2 && null rT2)
        then return False
        else if (S.member minBound wT1 && (not(null wT2) || not(null rT2)))
                 || (S.member minBound rT1 && not(null wT2))
                 || (S.member minBound wT2 && (not(null wT1) || not(null rT1)))
                 || (S.member minBound rT2 && not(null wT1))
-             then return False
-             else return $ S.disjoint wT1 wT2 && S.disjoint rT1 wT2 && S.disjoint rT2 wT1
+            then return False
+            else return $ S.disjoint wT1 wT2 && S.disjoint rT1 wT2 && S.disjoint rT2 wT1
+            -}
+
 
 -- | Returns the reads and writes of the current thread.
 dependentOperationsOfT :: GHC.HasCallStack => ExecutionState -> Thread -> Engine r ReadWriteSet

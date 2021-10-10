@@ -58,22 +58,22 @@ stop state message = do
 
 -- | Terminate with an invalid expression.
 invalid :: ExecutionState -> Expression -> Engine r a
-invalid state expression = throw $ Invalid (getPos expression) (state ^. programTrace)
+invalid state expression = throw $ Invalid (getPos expression) (map snd (state ^. programTrace))
 
 -- | Terminate with a deadlock.
 deadlock :: ExecutionState -> Engine r a
-deadlock state = throw $ Deadlock (state ^. programTrace)
+deadlock state = throw $ Deadlock (map snd (state ^. programTrace))
 
 -- | Terminate with an unknown result
 unknown :: ExecutionState -> Expression -> Engine r a
-unknown state expression = throw $ Unknown (getPos expression) (state ^. programTrace)
+unknown state expression = throw $ Unknown (getPos expression) (map snd (state ^. programTrace))
 
 -- | Terminate the current branch.
 finish :: ExecutionState -> Engine r a
 finish state = do
-    let trace = reverse $ map (^. _2) (state ^. programTrace)
+    let trace = reverse $ map (^. _2) $ map snd $ (state ^. programTrace)
     inform ("Finished program path: " ++ toDebugString trace)
-    measureFinish 
+    measureFinish
     empty
 
 -- | Retrieve the current Configuration.
