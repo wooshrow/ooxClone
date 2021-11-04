@@ -140,7 +140,7 @@ tsuitex = ("bla", TestList [
        --testOOX_concur concursimpel1_oox "Main.mThreeInvalidThree" expectInvalid 200,
        --simpletestOOX simple1_oox "SomeClass.mEight" expectValid
        -- testOOX_concur concursimpel1_oox "Main.mFive" expectValid 100
-       testOOX_withLargerArray "./examples/array.oox" "Main.foo" expectValid 100,
+       testOOX_withLargerArray "./examples/array.oox" "Main.foo_1" expectValid 100,
        testOOX_withLargerArray "./examples/array.oox" "Main.sort" expectValid 100,
        testOOX_withLargerArray "./examples/array.oox" "Main.max" expectValid 100
       ])

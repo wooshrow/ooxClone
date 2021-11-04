@@ -13,7 +13,8 @@ import Data.Error
 
 $digit     = [0-9]
 $alpha     = [a-zA-Z]
-@character = $digit | $alpha | "\\" | "\’" | "\0" | "\a" | \b 
+$alphaNumWithUnderscore  = [a-zA-Z0-9_]
+@character = $digit | $alpha | "\\" | "\’" | "\0" | "\a" | \b
            | "\f"   | "\n"   | "\r" | "\t" | "\v"
 @comment   = "//".*
 
@@ -93,7 +94,7 @@ tokens :-
     ";"     { \ (AlexPn _ l c) _ -> Positioned (newPos "" l c) TSemicolon        }
     ":"     { \ (AlexPn _ l c) _ -> Positioned (newPos "" l c) TColon            }
 
-    [$alpha]+ { \ (AlexPn _ l c) s -> Positioned (newPos "" l c) (TIdentifier s) }
+    [$alpha] [$alphaNumWithUnderscore]* { \ (AlexPn _ l c) s -> Positioned (newPos "" l c) (TIdentifier s) }
 
 {
 data Token
@@ -174,12 +175,12 @@ lexer fileName str = go (alexStartPos, '\n', [], str)
                 AlexError ((AlexPn _ line column),_,_,_) -> Left $ lexicalError (newPos fileName line column) ""
                 AlexSkip  inp' _       -> go inp'
                 AlexToken inp' len act -> do
-                    let tok = act pos (take len str') 
+                    let tok = act pos (take len str')
                     rest <- go inp'
                     return (tok : rest)
 
 instance Pretty Token where
-    pretty TAssert            = text "keyword assert" 
+    pretty TAssert            = text "keyword assert"
     pretty TAssume            = text "keyword assume"
     pretty TBool              = text "keyword bool"
     pretty TBreak             = text "keyword break"
