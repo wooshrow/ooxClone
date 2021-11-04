@@ -42,6 +42,14 @@ testOOX ooxFile targetMethod expectedResult depth =
       let (pass, oracleName) = expectedResult vresult
       assertBool oracleName pass
 
+testOOX_withLargerArray ooxFile targetMethod expectedResult depth =
+    TestLabel (ooxFile ++ " -- " ++ targetMethod)
+    $ TestCase
+    $ do
+      (vresult,stat) <- execute $ config0 { fileName = ooxFile , entryPoint = targetMethod, maximumDepth=depth, symbolicArraySize=4}
+      let (pass, oracleName) = expectedResult vresult
+      assertBool oracleName pass
+
 expectValid   ooxResult = (isValid ooxResult, "the target oox-program is VALID")
 expectInvalid ooxResult = (isInvalid ooxResult, "the target oox-program is INVALID")
 expectDeadlock ooxResult = (isDeadlock ooxResult, "the target oox-program contains DEADLOCK")
@@ -121,17 +129,21 @@ tsuite_deadlock = ("tsuite_deadlock",
       testOOX_concur "./examples/philosophers.oox" "Main.main" expectDeadlock 200
    ])
 
-tsuitex = TestList [
-       testOOX_concur concursimpel1_oox "Main.mOneInvalidTwo" expectInvalid 100,
-       testOOX_concur concursimpel1_oox "Main.mTwoInvalidOne" expectInvalid 100,
-       testOOX_concur concursimpel1_oox "Main.mTwoInvalidTwo" expectInvalid 100,
-       testOOX_concur concursimpel1_oox "Main.mThree" expectValid 150,
-       testOOX_concur concursimpel1_oox "Main.mThreeInvalidOne" expectInvalid 300,
-       testOOX_concur concursimpel1_oox "Main.mThreeInvalidOne" expectInvalid 300,
-       testOOX_concur concursimpel1_oox "Main.mThreeInvalidTwo" expectInvalid 300,
-       testOOX_concur concursimpel1_oox "Main.mThreeInvalidThree" expectInvalid 200,
-       simpletestOOX simple1_oox "SomeClass.mEight" expectValid
-      ]
+tsuitex = ("bla", TestList [
+       --testOOX_concur concursimpel1_oox "Main.mOneInvalidTwo" expectInvalid 100,
+       --testOOX_concur concursimpel1_oox "Main.mTwoInvalidOne" expectInvalid 100,
+       --testOOX_concur concursimpel1_oox "Main.mTwoInvalidTwo" expectInvalid 100,
+       --testOOX_concur concursimpel1_oox "Main.mThree" expectValid 150,
+       --testOOX_concur concursimpel1_oox "Main.mThreeInvalidOne" expectInvalid 300,
+       --testOOX_concur concursimpel1_oox "Main.mThreeInvalidOne" expectInvalid 300,
+       --testOOX_concur concursimpel1_oox "Main.mThreeInvalidTwo" expectInvalid 300,
+       --testOOX_concur concursimpel1_oox "Main.mThreeInvalidThree" expectInvalid 200,
+       --simpletestOOX simple1_oox "SomeClass.mEight" expectValid
+       -- testOOX_concur concursimpel1_oox "Main.mFive" expectValid 100
+       testOOX_withLargerArray "./examples/array.oox" "Main.foo" expectValid 100,
+       testOOX_withLargerArray "./examples/array.oox" "Main.sort" expectValid 100,
+       testOOX_withLargerArray "./examples/array.oox" "Main.max" expectValid 100
+      ])
 
 -- for running a testsiute:
 runTestSuite suite = do

@@ -291,7 +291,7 @@ getReferences state tid var = do
         SymbolicRef{}     ->
             case AliasMap.lookup (ref ^?! SL.var) (state ^. aliasMap) of
                 Just aliases -> return . S.map (^?! SL.ref) . S.filter (/= lit' nullLit') $ aliases
-                Nothing      -> return $ S.singleton minBound
-                                -- stop state (trace (">>> " ++ show var) noAliasesErrorMessage)
+                Nothing      -> -- return $ S.singleton minBound
+                                stop state (trace (">>> " ++ show var) noAliasesErrorMessage)
         _ ->
             stop state (expectedReferenceErrorMessage ref)

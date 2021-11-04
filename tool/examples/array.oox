@@ -2,7 +2,7 @@ class Main
 {
     // A combination between symbolic array and symbolic index.
     static void foo(int[] a, int i, int k)
-        requires(a != null && #a > 2 && 0 <= i && i < #a && 0 <= k && k < #a && (forall elem, index : a : elem > 0))
+        requires(a != null && #a > 1 && 0 <= i && i < #a && 0 <= k && k < #a && (forall elem, index : a : elem > 0))
     {
         a[0] := 1;
         int iValue := a[i];

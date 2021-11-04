@@ -201,4 +201,35 @@ class Main {
        assert y == N-1 ; // should be N
     }
 
+
+    static void mFive(Item[] items)
+        requires(items != null)
+    {
+       // assume the elements of the array are not null their
+       // x fields are at least 0:
+       int k := 0 ;
+       while (k < #items) {
+           Item o := items[k] ;
+           int vx := o.x ;
+           assume o != null && vx >= 0 ;
+           k := k+1 ;
+       }
+
+       k := 0 ;
+       while (k < #items) {
+           Item o := items[k] ;
+           fork Main.incr(o) ;
+           // Main.incr(o) ;
+           k := k+1 ;
+       }
+       join ;
+       k := 0 ;
+       while (k < #items) {
+          Item o := items[k] ;
+          int y := o.x ;
+          assert y > 0  ;
+          k := k+1 ;
+       }
+    }
+
 }
