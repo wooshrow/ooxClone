@@ -1,8 +1,10 @@
+// Dining philosophers. This version has deadlock, to show
+// that OOX can find it.
 class Main {
     static void main()
         exceptional(false)
     {
-        int n := 2;
+        int n := 4;
         Fork[] forks := new Fork[n];
         int i := 0;
 

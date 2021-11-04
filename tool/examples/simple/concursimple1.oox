@@ -163,6 +163,24 @@ class Main {
        assert y == N ; // should be N+a
     }
 
+    static void mThreeInvalidThree(int a) {
+       int k := 0 ;
+       int N := 4 ;
+       Item[] items := new Item[N] ;
+       while (k<N) {
+           Item o := new Item(a+k) ;
+           items[k] := o ;
+           fork Main.incr(o) ;
+           //Main.incr(o) ;
+           k := k+1 ;
+       }
+       join ;
+       k := 0 ;
+       Item o := items[2] ;
+       int y := o.x ;
+       assert y == 2 ; // should be 3+a
+    }
+
     static void mFourInvalid(int N)
         requires(N==2)
     {

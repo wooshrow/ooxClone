@@ -7,6 +7,9 @@ class Item {
     Item(int y) {
        this.x := y ;
     }
+    void set(int xx) {
+       this.x := xx ;
+    }
 }
 
 class SomeClass
@@ -175,6 +178,36 @@ class SomeClass
         }
         assert (exists v,i: values : v == 99) ;
         // assert k < #a ;
+    }
+
+    static void mEight(Item[] a, int i)
+        requires(a!=null && 0<=i && i<#a && (forall v,j: a : v!=null))
+    {
+        // assume all elements are aliases
+        int k := 0 ;
+        Item o := a[0] ;
+        while (k < #a) {
+           Item p := a[k] ;
+           assume p == o ;
+           k := k+1 ;
+        }
+        k := #a ;
+        while (0<k) {
+           k := k - 1 ;
+           Item p := a[k] ;
+           p.set(k) ;
+        }
+        int j := 0 ;
+        while (j < #a) {
+           o := a[j] ;
+           int val := o.x ;
+           assert val == 0 ;
+           j := j+1 ;
+        }
+
+        o := a[i] ;
+        int val := o.x ;
+        assert val == 0 ;
     }
 
 }

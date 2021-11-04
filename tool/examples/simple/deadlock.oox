@@ -1,0 +1,35 @@
+class Main
+{
+    static void main()
+        exceptional(false)    
+    {
+        Ref a := new Ref();
+        Ref b := new Ref();
+        fork Main.thread(a, b);
+        fork Main.thread(b, a);
+        join;
+    }
+
+    static void thread(Ref a, Ref b)
+        exceptional(false)   
+    {
+        while (true)
+        {
+            lock (b)
+            {
+                lock (a)
+                {
+                    ;
+                }
+            }
+        }
+    }
+}
+
+class Ref
+{
+    Ref()
+    {
+        ;
+    }
+}

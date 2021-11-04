@@ -9,13 +9,14 @@ module Execution.Semantics(
     , execException
     , execTryEntry
     , execTryExit
-    , execCatchEntry 
+    , execCatchEntry
     , execDeclare
     , execLock
     , execUnlock
     , execAssign
 ) where
-       
+
+import Debug.Trace
 import qualified GHC.Stack as GHC
 import qualified Data.Set as S
 import qualified Data.Map as M
@@ -65,7 +66,7 @@ execAssert state0 assertion = do
             Left formula2 -> do
                 _ <- verify state3 (formula2 & SL.info .~ getPos assertion)
                 return state3
-    
+
 execAssertEnsures :: GHC.HasCallStack => ExecutionState -> Engine r ExecutionState
 execAssertEnsures state = do
     config <- askConfig
@@ -78,7 +79,7 @@ execAssertEnsures state = do
                     maybe (return state) (execAssert state) ensures
                 Nothing ->
                     stop state cannotGetCurrentThreadErrorMessage
-        else 
+        else
             return state
 
 execAssertRequires :: GHC.HasCallStack => ExecutionState -> Engine r ExecutionState
@@ -93,7 +94,7 @@ execAssertRequires state = do
                     maybe (return state) (execAssert state) requires
                 Nothing ->
                     stop state cannotGetCurrentThreadErrorMessage
-        else 
+        else
             return state
 
 execAssertExceptional :: GHC.HasCallStack => ExecutionState -> Engine r ExecutionState
@@ -117,7 +118,7 @@ execAssume state0 assumption0 = do
     concretize concretizations state1 $ \ state2 -> do
         (state3, assumption1) <- evaluateAsBool state2 assumption0
         case assumption1 of
-            Right True  ->  
+            Right True  ->
                 return state3
             Right False -> do
                 debug "Constraint is infeasible"
@@ -144,9 +145,9 @@ execInvocation state0 invocation lhs neighbour
                 Constructor _ _ _ _ labels _ -> do
                     state3 <- execConstructor state2 member arguments lhs neighbour
                     return (state3, fst labels)
-                Field _ name _ -> 
+                Field _ name _ ->
                     stop state2 (expectedMethodMemberErrorMessage name)
-    | otherwise = 
+    | otherwise =
         stop state0 unresolvedErrorMessage
 
 execStaticMethod :: GHC.HasCallStack => ExecutionState -> DeclarationMember -> [Expression] -> Maybe Lhs -> Node -> Engine r ExecutionState
@@ -179,7 +180,7 @@ execFork :: GHC.HasCallStack => ExecutionState -> DeclarationMember -> [Expressi
 execFork state member arguments
     | Just parent <- state ^. currentThreadId =
         spawn state parent member arguments
-    | otherwise = 
+    | otherwise =
         stop state cannotGetCurrentThreadErrorMessage
 
 execMemberEntry :: GHC.HasCallStack => ExecutionState -> Engine r ExecutionState
@@ -214,7 +215,7 @@ execMemberExit state0 returnTy = do
                             state3 <- writeDeclaration state2 retval' retval
                             let rhs = rhsExpr' (var' retval' returnTy)
                             (, neighbour) <$> execAssign state3 lhs rhs
-                        Nothing  -> 
+                        Nothing  ->
                             -- No assignment to be done, continue the execution.
                             return (state2, neighbour)
 
@@ -232,10 +233,10 @@ execException :: GHC.HasCallStack => ExecutionState -> Engine r (ExecutionState,
 execException state0
     -- Within a try block.
     | Just (handler, pops) <- findLastHandler state0 = do
-        debug ("Handling an exception with '" ++ show pops ++ "' left") 
+        debug ("Handling an exception with '" ++ show pops ++ "' left")
         case pops of
             -- With no more stack frames to pop.
-            0 -> 
+            0 ->
                 return (state0, Just ((), handler))
             -- With some stack frames left to pop
             _ -> do
@@ -246,7 +247,7 @@ execException state0
     | otherwise = do
         state1 <- execAssertExceptional state0
         if isLastStackFrame state1
-            then 
+            then
                 finish state1
             else do
                 state2 <- popStackFrame state1
@@ -268,38 +269,44 @@ execDeclare state0 ty var = do
 
 execLock :: GHC.HasCallStack => ExecutionState -> Identifier -> Engine r ExecutionState
 execLock state0 var = do
-    ref <- readDeclaration state0 var 
+    ref <- readDeclaration state0 var
     case ref of
         Lit NullLit{} _ _ -> infeasible
         SymbolicRef{}     -> do
-            (state1, concretizations) <- concretesOfType state0 ARRAYRuntimeType ref
-            concretize concretizations state1 $ \ state2 ->
-                execLock state2 var
+            -- if ref is a symbolic-ref of type array, concretize it:
+            --debug (">>> trying to concretize " ++ show ref)
+            (state1, concretizations1) <- concretesOfType state0 ARRAYRuntimeType ref
+            (state2, concretizations2) <- concretesOfType state1 REFRuntimeType ref
+            --debug (">>> done concretizing " ++ show ref)
+            --ref2 <- readDeclaration state0 var
+            --debug (">>> new ref: " ++ show ref2)
+            concretize (concretizations1 ++ concretizations2) state2 $ \ state3 ->
+                execLock state3 var
         Ref ref _ _ ->
             case state0 ^. currentThreadId of
-                Just currentTid -> 
+                Just currentTid ->
                     case LockSet.lookup ref (state0 ^. locks) of
-                        Just tid 
+                        Just tid
                             | tid == currentTid -> return state0
                             | otherwise -> infeasible
-                        Nothing -> 
+                        Nothing ->
                             return $ state0 & (locks %~ LockSet.insert ref currentTid)
-                Nothing -> 
+                Nothing ->
                     stop state0 cannotGetCurrentThreadErrorMessage
-        _ -> 
+        _ ->
             stop state0 (expectedReferenceErrorMessage ref)
 
 execUnlock :: GHC.HasCallStack => ExecutionState -> Identifier -> Engine r ExecutionState
 execUnlock state var = do
     ref <- readDeclaration state var
     case ref of
-        Ref{} -> 
+        Ref{} ->
             return $ state & (locks %~ LockSet.remove (ref ^?! SL.ref))
-        _ -> 
+        _ ->
             stop state (expectedConcreteReferenceErrorMessage ref)
 
 execAssign :: GHC.HasCallStack => ExecutionState -> Lhs -> Rhs -> Engine r ExecutionState
-execAssign state0 _ RhsCall{} = 
+execAssign state0 _ RhsCall{} =
     return state0
 execAssign state0 lhs rhs = do
     (state1, value) <- execRhs state0 rhs
