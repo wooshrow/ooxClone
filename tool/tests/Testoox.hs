@@ -116,7 +116,7 @@ tsuite_concursimple1 = ("tsuite_concursimple1",
    ])
 
 --
--- Some tests on lock construct
+-- Some tests on lock construct and deadlock checking
 --
 tsuite_locks1 = ("tsuite_locks1",
    TestList [
@@ -124,6 +124,15 @@ tsuite_locks1 = ("tsuite_locks1",
       testOOX_concur "./examples/simple/locks1.oox" "Main.main_invalid1" expectInvalid 50,
       testOOX_concur "./examples/simple/deadlock.oox" "Main.main" expectDeadlock 50,
       testOOX_concur "./examples/philosophers.oox" "Main.main" expectDeadlock 200
+   ])
+
+--
+-- Some tests involving arrays
+--
+tsuite_arrays = ("tsuite_arrays",
+   TestList [
+      simpletestOOX "./examples/array/array1.oox" "Main.foo1" expectValid,
+      simpletestOOX "./examples/array/array1.oox" "Main.foo1_invalid" expectInvalid
    ])
 
 tsuitex = ("bla", TestList [

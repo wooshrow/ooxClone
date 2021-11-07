@@ -1,8 +1,11 @@
 class Main
 {
     // A combination between symbolic array and symbolic index.
-    static void foo_1(int[] a, int i, int k)
-        requires(a != null && #a > 1 && 0 <= i && i < #a && 0 <= k && k < #a && (forall elem, index : a : elem > 0))
+    static void foo1(int[] a, int i, int k)
+        requires(a != null && #a > 1
+                 && 0 <= i && i < #a
+                 && 0 <= k && k < #a
+                 && (forall elem, index : a : elem > 0))
     {
         a[0] := 1;
         int iValue := a[i];
@@ -10,6 +13,20 @@ class Main
 
         int value := a[k];
         assert value >= 0;
+    }
+
+    static void foo1_invalid(int[] a, int i, int k)
+        requires(a != null && #a > 1
+                 && 0 <= i && i < #a
+                 && 0 <= k && k < #a
+                 && (forall elem, index : a : elem > 0))
+    {
+        a[0] := 1;
+        int iValue := a[i];
+        a[1] := iValue - 1;
+
+        int value := a[k];
+        assert value > 0;
     }
 
     // A Bubblesort algorithm.
