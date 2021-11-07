@@ -68,28 +68,28 @@ testOOX_concur ooxFile targetMethod expectedResult depth =
 simple1_oox = "./examples/simple/simple1.oox"
 tsuite_simple1 = ("tsuite_simple1",
    TestList [
-     simpletestOOX simple1_oox "SomeClass.mOne" expectValid,
-     simpletestOOX simple1_oox "SomeClass.mOneInvalid" expectInvalid,
-     simpletestOOX simple1_oox "SomeClass.mTwo" expectValid,
-     simpletestOOX simple1_oox "SomeClass.mTwoInvalid" expectInvalid,
-     simpletestOOX simple1_oox "SomeClass.mThree" expectValid,
+     simpletestOOX simple1_oox "SomeClass.m1" expectValid,
+     simpletestOOX simple1_oox "SomeClass.m1Invalid" expectInvalid,
+     simpletestOOX simple1_oox "SomeClass.m2" expectValid,
+     simpletestOOX simple1_oox "SomeClass.m2Invalid" expectInvalid,
+     simpletestOOX simple1_oox "SomeClass.m3" expectValid,
      -- m3-invalid requires a more elaborate setup:
-     TestLabel (simple1_oox ++ " -- " ++ "SomeClass.mThreeInvalid")
+     TestLabel (simple1_oox ++ " -- " ++ "SomeClass.m3Invalid")
        $ TestCase
        $ do
           (vresult,_) <- execute $ config0 {
                            fileName = simple1_oox ,
-                           entryPoint = "SomeClass.mThreeInvalid",
+                           entryPoint = "SomeClass.m3Invalid",
                            symbolicArraySize = 4,
                            maximumDepth = 100}
           assertBool "the target is invalid" (isInvalid vresult),
-     simpletestOOX simple1_oox "SomeClass.mFour" expectValid,
-     simpletestOOX simple1_oox "SomeClass.mFourInvalid" expectInvalid,
-     simpletestOOX simple1_oox "SomeClass.mFive" expectValid,
-     simpletestOOX simple1_oox "SomeClass.mFiveInvalid" expectInvalid,
-     simpletestOOX simple1_oox "SomeClass.mSix" expectValid,
-     simpletestOOX simple1_oox "SomeClass.mSeven" expectValid,
-     simpletestOOX simple1_oox "SomeClass.mEight" expectValid
+     simpletestOOX simple1_oox "SomeClass.m4" expectValid,
+     simpletestOOX simple1_oox "SomeClass.m4Invalid" expectInvalid,
+     simpletestOOX simple1_oox "SomeClass.m5" expectValid,
+     simpletestOOX simple1_oox "SomeClass.m5Invalid" expectInvalid,
+     simpletestOOX simple1_oox "SomeClass.m6" expectValid,
+     simpletestOOX simple1_oox "SomeClass.m7" expectValid,
+     simpletestOOX simple1_oox "SomeClass.m8" expectValid
      ])
 
 --
@@ -99,50 +99,40 @@ tsuite_simple1 = ("tsuite_simple1",
 concursimpel1_oox = "./examples/simple/concursimple1.oox"
 tsuite_concursimple1 = ("tsuite_concursimple1",
    TestList [
-     --simpletestOOX concursimpel1_oox "Main.incr" expectValid,
-     --simpletestOOX concursimpel1_oox "Main.incrInvalid" expectInvalid,
-     testOOX_concur concursimpel1_oox "Main.mOne" expectValid 100,
-     testOOX_concur concursimpel1_oox "Main.mOneInvalidOne" expectInvalid 100,
-     testOOX_concur concursimpel1_oox "Main.mOneInvalidTwo" expectInvalid 100,
-     testOOX_concur concursimpel1_oox "Main.mTwo" expectValid 200,
-     testOOX_concur concursimpel1_oox "Main.mTwoInvalidOne" expectInvalid 100,
-     testOOX_concur concursimpel1_oox "Main.mTwoInvalidTwo" expectInvalid 100,
-     testOOX_concur concursimpel1_oox "Main.mThree" expectValid 200,
-     testOOX_concur concursimpel1_oox "Main.mThreeInvalidOne" expectInvalid 300,
-     testOOX_concur concursimpel1_oox "Main.mThreeInvalidTwo" expectInvalid 200,
-     testOOX_concur concursimpel1_oox "Main.mThreeInvalidThree" expectInvalid 200
+     simpletestOOX concursimpel1_oox "Main.incr" expectValid,
+     simpletestOOX concursimpel1_oox "Main.incrInvalid" expectInvalid,
+     testOOX_concur concursimpel1_oox "Main.m1" expectValid 100,
+     testOOX_concur concursimpel1_oox "Main.m1_invalid1" expectInvalid 100,
+     testOOX_concur concursimpel1_oox "Main.m1_invalid2" expectInvalid 100,
+     testOOX_concur concursimpel1_oox "Main.m2" expectValid 200,
+     testOOX_concur concursimpel1_oox "Main.m2_invalid1" expectInvalid 100,
+     testOOX_concur concursimpel1_oox "Main.m2_invalid2" expectInvalid 100,
+     testOOX_concur concursimpel1_oox "Main.m3" expectValid 200,
+     testOOX_concur concursimpel1_oox "Main.m3_invalid1" expectInvalid 300,
+     testOOX_concur concursimpel1_oox "Main.m3_invalid2" expectInvalid 200,
+     testOOX_concur concursimpel1_oox "Main.m3_invalid3" expectInvalid 200,
+     testOOX_concur concursimpel1_oox "Main.m4_invalid" expectInvalid 200,
+     testOOX_concur concursimpel1_oox "Main.m5" expectValid 300
    ])
 
 --
 -- Some tests on lock construct
 --
-lock1_oox = "./examples/simple/locks1.oox"
 tsuite_locks1 = ("tsuite_locks1",
    TestList [
-      testOOX_concur lock1_oox "Main.main" expectValid 50,
-      testOOX_concur lock1_oox "Main.mainInvalidOne" expectInvalid 50
-   ])
-
-tsuite_deadlock = ("tsuite_deadlock",
-   TestList [
+      testOOX_concur "./examples/simple/locks1.oox" "Main.main" expectValid 50,
+      testOOX_concur "./examples/simple/locks1.oox" "Main.main_invalid1" expectInvalid 50,
       testOOX_concur "./examples/simple/deadlock.oox" "Main.main" expectDeadlock 50,
       testOOX_concur "./examples/philosophers.oox" "Main.main" expectDeadlock 200
    ])
 
 tsuitex = ("bla", TestList [
-       --testOOX_concur concursimpel1_oox "Main.mOneInvalidTwo" expectInvalid 100,
-       --testOOX_concur concursimpel1_oox "Main.mTwoInvalidOne" expectInvalid 100,
-       --testOOX_concur concursimpel1_oox "Main.mTwoInvalidTwo" expectInvalid 100,
-       --testOOX_concur concursimpel1_oox "Main.mThree" expectValid 150,
-       --testOOX_concur concursimpel1_oox "Main.mThreeInvalidOne" expectInvalid 300,
-       --testOOX_concur concursimpel1_oox "Main.mThreeInvalidOne" expectInvalid 300,
-       --testOOX_concur concursimpel1_oox "Main.mThreeInvalidTwo" expectInvalid 300,
-       --testOOX_concur concursimpel1_oox "Main.mThreeInvalidThree" expectInvalid 200,
-       --simpletestOOX simple1_oox "SomeClass.mEight" expectValid
        -- testOOX_concur concursimpel1_oox "Main.mFive" expectValid 100
-       testOOX_withLargerArray "./examples/array.oox" "Main.foo_1" expectValid 100,
-       testOOX_withLargerArray "./examples/array.oox" "Main.sort" expectValid 100,
-       testOOX_withLargerArray "./examples/array.oox" "Main.max" expectValid 100
+       --testOOX_withLargerArray "./examples/array.oox" "Main.foo_1" expectValid 100,
+       --testOOX_withLargerArray "./examples/array.oox" "Main.sort" expectValid 100,
+       --testOOX_withLargerArray "./examples/array.oox" "Main.max" expectValid 100
+       testOOX_withLargerArray "./examples/array2.oox" "Main.sort" expectValid 100
+       --testOOX_withLargerArray "./examples/array.oox" "Main.max" expectValid 100
       ])
 
 -- for running a testsiute:
@@ -168,3 +158,4 @@ main::IO()
 main = do
   runTestSuite tsuite_simple1
   runTestSuite tsuite_concursimple1
+  runTestSuite tsuite_locks1

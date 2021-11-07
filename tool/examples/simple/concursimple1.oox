@@ -41,7 +41,7 @@ class Main {
         }
     }
 
-    static void mOne(int a) {
+    static void m1(int a) {
        Item o := new Item(a) ;
        Item p := new Item(a + 10) ;
        fork Main.incr(o) ;
@@ -52,7 +52,7 @@ class Main {
        assert ox==a+1 && px==a+11 ;
     }
 
-    static void mOneInvalidOne(int a) {
+    static void m1_invalid1(int a) {
        Item o := new Item(a) ;
        Item p := new Item(a+10) ;
        fork Main.incr(o) ;
@@ -63,7 +63,7 @@ class Main {
        assert ox!=a+1 ;
     }
 
-    static void mOneInvalidTwo(int a) {
+    static void m1_invalid2(int a) {
        Item o := new Item(a) ;
        Item p := new Item(a+10) ;
        fork Main.incr(o) ;
@@ -74,7 +74,7 @@ class Main {
        assert px!=a+11 ;
     }
 
-    static void mTwo(int y, int z)
+    static void m2(int y, int z)
       requires(y>=0 && y<z)
     {
        Item o := new Item(y) ;
@@ -85,7 +85,7 @@ class Main {
        assert x==y+1 || x==z ;
     }
 
-    static void mTwoInvalidOne(int y, int z)
+    static void m2_invalid1(int y, int z)
        requires(y>=0 && y<z)
     {
        Item o := new Item(y) ;
@@ -96,7 +96,7 @@ class Main {
        assert x==y+1  ;
     }
 
-    static void mTwoInvalidTwo(int y, int z)
+    static void m2_invalid2(int y, int z)
        requires(y>=0 && y<z)
     {
        Item o := new Item(y) ;
@@ -107,7 +107,7 @@ class Main {
        assert x==z  ;
     }
 
-    static void mThree(int a) {
+    static void m3(int a) {
        int k := 0 ;
        int N := 4 ;
        Item[] items := new Item[N] ;
@@ -128,7 +128,7 @@ class Main {
        }
     }
 
-    static void mThreeInvalidOne(int a) {
+    static void m3_invalid1(int a) {
        int k := 0 ;
        int N := 6 ;
        Item[] items := new Item[N] ;
@@ -145,7 +145,7 @@ class Main {
        assert y == a ; // should be a+1
     }
 
-    static void mThreeInvalidTwo(int a) {
+    static void m3_invalid2(int a) {
        int k := 0 ;
        int N := 4 ;
        Item[] items := new Item[N] ;
@@ -163,7 +163,7 @@ class Main {
        assert y == N ; // should be N+a
     }
 
-    static void mThreeInvalidThree(int a) {
+    static void m3_invalid3(int a) {
        int k := 0 ;
        int N := 4 ;
        Item[] items := new Item[N] ;
@@ -181,7 +181,7 @@ class Main {
        assert y == 2 ; // should be 3+a
     }
 
-    static void mFourInvalid(int N)
+    static void m4_invalid(int N)
         requires(N==2)
     {
        int k := 0 ;
@@ -202,7 +202,7 @@ class Main {
     }
 
 
-    static void mFive(Item[] items)
+    static void m5(Item[] items)
         requires(items != null)
     {
        // assume the elements of the array are not null their

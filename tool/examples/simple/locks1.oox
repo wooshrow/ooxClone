@@ -10,7 +10,7 @@ class Num
 
 class Main
 {
-    static void main(Num a, Num b)
+    static void main (Num a, Num b)
     {
         assume a != null ;
         fork Main.thread(a);
@@ -27,7 +27,7 @@ class Main
         assert ax == 1 || ax == 2;
     }
 
-    static void mainInvalidOne(Num a, Num b)
+    static void main_invalid1(Num a, Num b)
     {
         assume a != null ;
         fork Main.thread(a);

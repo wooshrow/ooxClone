@@ -1,17 +1,22 @@
+// Containing a deadlock example. Not all executions
+// will deadlock, but one will. To check if the
+// verifier can find it.
+
 class Main
 {
     static void main()
-        exceptional(false)    
+        exceptional(false)
     {
         Ref a := new Ref();
         Ref b := new Ref();
+        // this may dead-lock:
         fork Main.thread(a, b);
         fork Main.thread(b, a);
         join;
     }
 
     static void thread(Ref a, Ref b)
-        exceptional(false)   
+        exceptional(false)
     {
         while (true)
         {

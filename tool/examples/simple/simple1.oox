@@ -15,7 +15,7 @@ class Item {
 class SomeClass
 {
     // valid
-    static int mOne(int x, int y)
+    static int m1(int x, int y)
         requires(x > y)
     {
         if (x==y) assert false ;
@@ -25,7 +25,7 @@ class SomeClass
     }
 
     // not valid
-    static int mOneInvalid(int x, int y)
+    static int m1Invalid(int x, int y)
         requires(x > y)
     {
         if (x==y) assert false ;
@@ -35,7 +35,7 @@ class SomeClass
     }
 
     // valid
-    static void mTwo(int x, int y)
+    static void m2(int x, int y)
         requires(x > y)
     {
         while(x>y) {
@@ -47,7 +47,7 @@ class SomeClass
     }
 
     // invalid
-    static void mTwoInvalid(int x, int y)
+    static void m2Invalid(int x, int y)
         requires(x > y)
     {
         while(x>y) {
@@ -59,7 +59,7 @@ class SomeClass
     }
 
     // valid
-    static void mThree(int[] a, int x)
+    static void m3(int[] a, int x)
         requires(a != null && #a > 0 && x<=0 && (forall elem, index : a : elem > 0))
     {
         int k := 0 ;
@@ -73,7 +73,7 @@ class SomeClass
     }
 
     // valid
-    static void mThreeInvalid(int[] a, int x)
+    static void m3Invalid(int[] a, int x)
         requires(a != null && #a > 0 && x<=0 && (forall elem, index : a : elem > 0))
     {
         int k := 0 ;
@@ -92,7 +92,7 @@ class SomeClass
     }
 
     // valid
-    static void mFour(int[] a, int[] b)
+    static void m4(int[] a, int[] b)
         requires(a!=null && #a>1 && b!=null && #b>0)
     {
         int k := 1 ;
@@ -103,8 +103,8 @@ class SomeClass
         }
     }
 
-    // valid
-    static void mFourInvalid(int[] a, int[] b)
+    // invalid
+    static void m4Invalid(int[] a, int[] b)
         requires(a!=null && #a>1 && b!=null && #b>0)
     {
         int k := 1 ;
@@ -116,7 +116,7 @@ class SomeClass
     }
 
     // valid
-    static void mFive(Item o, Item p)
+    static void m5(Item o, Item p)
         requires(o!=null && p!=null)
     {
         int x := o.x ;
@@ -127,7 +127,7 @@ class SomeClass
     }
 
     // invalid
-    static void mFiveInvalid(Item o, Item p)
+    static void m5Invalid(Item o, Item p)
         requires(o!=null && p!=null)
     {
         int x := o.x ;
@@ -141,7 +141,7 @@ class SomeClass
     }
 
     // valid
-    static void mSix(Item o, Item p)
+    static void m6(Item o, Item p)
         requires(o!=null && p!=null)
     {
         o.x := 99 ;
@@ -152,7 +152,7 @@ class SomeClass
     }
 
     // valid
-    static void mSeven(Item[] a)
+    static void m7(Item[] a)
         requires(a!=null && #a>1 && (exists v,i: a : v!=null))
     {
         int k := 0 ;
@@ -180,7 +180,7 @@ class SomeClass
         // assert k < #a ;
     }
 
-    static void mEight(Item[] a, int i)
+    static void m8(Item[] a, int i)
         requires(a!=null && 0<=i && i<#a && (forall v,j: a : v!=null))
     {
         // assume all elements are aliases

@@ -291,7 +291,11 @@ getReferences state tid var = do
         SymbolicRef{}     ->
             case AliasMap.lookup (ref ^?! SL.var) (state ^. aliasMap) of
                 Just aliases -> return . S.map (^?! SL.ref) . S.filter (/= lit' nullLit') $ aliases
-                Nothing      -> -- return $ S.singleton minBound
-                                stop state (trace (">>> " ++ show var) noAliasesErrorMessage)
+                Nothing      -> -- WP hack: the case does occur! I dont see a convenient
+                                -- way to fix this in a nice way, so this hack is added.
+                                -- note that next time around var is likely to be already
+                                -- identified
+                                return $ S.singleton minBound
+                                -- stop state (trace (">>> " ++ show var) noAliasesErrorMessage)
         _ ->
             stop state (expectedReferenceErrorMessage ref)
