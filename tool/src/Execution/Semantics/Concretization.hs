@@ -166,7 +166,9 @@ createSymbolicVar (Identifier name pos) ty
 initializeSymbolicArrays :: GHC.HasCallStack => ExecutionState -> Expression -> Engine r ExecutionState
 initializeSymbolicArrays state0 var@(SymbolicRef ref ty _) = do
     config <- askConfig
-    let sizes = [1..symbolicArraySize config]
+    -- WP: bug.. should start from 0! Making fix:
+    -- let sizes = [1..symbolicArraySize config]
+    let sizes = [0..symbolicArraySize config]
     (state1, refs) <- mapAccumM ( \ stateN -> initializeSymbolicArray stateN var) state0 sizes
     let aliases  = if symbolicAliases config then otherAliasesOfType ty (state1 ^. aliasMap) else S.empty
     let nullCase = if symbolicNulls config then S.singleton (lit' nullLit') else S.empty
