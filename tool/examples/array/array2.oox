@@ -1,3 +1,6 @@
+//
+// For testing oox against arrays of objects.
+//
 class Point {
     int x ;
     int y ;
@@ -10,7 +13,35 @@ class Point {
 class Main
 {
 
-    static void foo(Point[] a, int i, int k)
+    static void foo1(Point[] a, int i, int k)
+          requires(a != null && #a > 1
+                   && 0 <= i && i < #a
+                   && 0 <= k && k < #a)
+    {
+       Point o := a[i] ;
+       o.x := 0 ;
+       Point p := a[0] ;
+       p.x := 1 ;
+       Point r := a[0] ;
+       int v := r.x ;
+       assert v == 1 ;
+    }
+
+    static void foo1_invalid(Point[] a, int i, int k)
+          requires(a != null && #a > 1
+                   && 0 <= i && i < #a
+                   && 0 <= k && k < #a)
+    {
+       Point o := a[i] ;
+       o.x := 0 ;
+       Point p := a[0] ;
+       p.x := 1 ;
+       Point r := a[i] ;
+       int v := r.x ;
+       assert v == 0 ;
+    }
+
+    static void foo2(Point[] a, int i, int k)
           requires(a != null && #a > 1
                    && 0 <= i && i < #a
                    && 0 <= k && k < #a)
@@ -30,7 +61,6 @@ class Main
     // A Bubblesort algorithm.
     static Point[] sort(Point[] array)
         requires(array != null)
-        ensures(true)
         exceptional(false)
     {
         bool sorted := false;

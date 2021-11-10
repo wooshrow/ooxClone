@@ -140,16 +140,33 @@ tsuite_locks1 = ("tsuite_locks1",
 --
 tsuite_arrays = ("tsuite_arrays",
    TestList [
-      --simpletestOOX "./examples/array/array1.oox" "Main.foo" expectValid,
-      --simpletestOOX "./examples/array/array1.oox" "Main.foo_invalid" expectInvalid,
-      --simpletestOOX "./examples/array/array1.oox" "Main.max" expectValid,
-      --simpletestOOX "./examples/array/array1.oox" "Main.max_invalid1" expectInvalid,
-      --simpletestOOX "./examples/array/array1.oox" "Main.max_invalid2" expectInvalid,
-      --testOOX_concur "./examples/array/array1.oox" "Main.sort" expectValid 100,
-      --testOOX_concur "./examples/array/array1.oox" "Main.sort_invalid1" expectInvalid 100,
-      testOOX_concur "./examples/array/array2.oox" "Main.foo" expectValid 100
-
+      simpletestOOX "./examples/array/array1.oox" "Main.foo" expectValid,
+      simpletestOOX "./examples/array/array1.oox" "Main.foo_invalid" expectInvalid,
+      simpletestOOX "./examples/array/array1.oox" "Main.max" expectValid,
+      simpletestOOX "./examples/array/array1.oox" "Main.max_invalid1" expectInvalid,
+      simpletestOOX "./examples/array/array1.oox" "Main.max_invalid2" expectInvalid,
+      testOOX_concur "./examples/array/array1.oox" "Main.sort" expectValid 100,
+      testOOX_concur "./examples/array/array1.oox" "Main.sort_invalid1" expectInvalid 100,
+      simpletestOOX "./examples/array/array2.oox" "Main.foo1" expectValid,
+      simpletestOOX "./examples/array/array2.oox" "Main.foo1_invalid" expectInvalid,
+      testOOX_concur "./examples/array/array2.oox" "Main.foo2" expectInvalid 100,
+      testOOX_concur "./examples/array/array2.oox" "Main.sort" expectInvalid 100
    ])
+
+--
+-- Some tests involving exceptions
+--
+tsuite_exceptions = ("tsuite_exceptions",
+  TestList [
+     simpletestOOX "./examples/simple/exceptions.oox" "Main.m1" expectValid,
+     simpletestOOX "./examples/simple/exceptions.oox" "Main.m1_invalid" expectInvalid,
+     simpletestOOX "./examples/simple/exceptions.oox" "Main.m2" expectValid,
+     simpletestOOX "./examples/simple/exceptions.oox" "Main.m3" expectValid,
+     simpletestOOX "./examples/simple/exceptions.oox" "Main.m3_invalid1" expectInvalid,
+     simpletestOOX "./examples/simple/exceptions.oox" "Main.m3_invalid2" expectInvalid,
+     simpletestOOX "./examples/simple/exceptions.oox" "Main.nullExc1" expectValid,
+     simpletestOOX "./examples/simple/exceptions.oox" "Main.nullExc2" expectValid
+  ] )
 
 tsuitex = ("bla", TestList [
        -- testOOX_concur concursimpel1_oox "Main.mFive" expectValid 100
@@ -184,3 +201,4 @@ main = do
   runTestSuite tsuite_simple1
   runTestSuite tsuite_concursimple1
   runTestSuite tsuite_locks1
+  runTestSuite tsuite_arrays
