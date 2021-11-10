@@ -39,6 +39,7 @@ import           Execution.Semantics.Concretization
 import           Execution.Semantics.StackFrame
 import           Execution.Semantics.Heap
 import           Execution.Semantics.Process
+import           Execution.Semantics.AssertAssume
 import           Execution.Semantics.Assignment
 import           Execution.Effects
 import           Execution.Errors
@@ -49,24 +50,10 @@ import           Execution.State.PathConstraints as PathConstraints
 import           Execution.State.LockSet as LockSet
 import           Execution.Verification
 
+{-
 execAssert :: GHC.HasCallStack => ExecutionState -> Expression -> Engine r ExecutionState
-execAssert state0 assertion = do
-    measureVerification
-    let assumptions = state0 ^. constraints
-    (state1, concretizations) <- concretesOfType state0 ARRAYRuntimeType assertion
-    concretize concretizations state1 $ \ state2 -> do
-        let formula0 = neg' (implies' (asExpression assumptions) assertion)
-        debug ("Verifying: '" ++ toString formula0 ++ "'")
-        (state3, formula1) <- evaluateAsBool state2 formula0
-        case formula1 of
-            Right True ->
-                invalid state3 assertion
-            Right False ->
-                return state3
-            Left formula2 -> do
-                _ <- verify state3 (formula2 & SL.info .~ getPos assertion)
-                return state3
-
+>>> moved to module AssertAssume
+-}
 execAssertEnsures :: GHC.HasCallStack => ExecutionState -> Engine r ExecutionState
 execAssertEnsures state = do
     config <- askConfig
@@ -112,20 +99,10 @@ execAssertExceptional state = do
         else
             return state
 
+{-
 execAssume :: GHC.HasCallStack => ExecutionState -> Expression -> Engine r ExecutionState
-execAssume state0 assumption0 = do
-    (state1, concretizations) <- concretesOfType state0 ARRAYRuntimeType assumption0
-    concretize concretizations state1 $ \ state2 -> do
-        (state3, assumption1) <- evaluateAsBool state2 assumption0
-        case assumption1 of
-            Right True  ->
-                return state3
-            Right False -> do
-                debug "Constraint is infeasible"
-                infeasible
-            Left assumption2 -> do
-                debug ("Adding constraint: '" ++ toString assumption2 ++ "'")
-                return $ state3 & (constraints <>~ PathConstraints.singleton assumption2)
+>>> moved to module AssertAssume
+-}
 
 execInvocation :: GHC.HasCallStack => ExecutionState -> Invocation -> Maybe Lhs -> Node -> Engine r (ExecutionState, Node)
 execInvocation state0 invocation lhs neighbour

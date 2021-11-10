@@ -35,17 +35,23 @@ config0 =  Configuration
 -- for testing non-concurrent program:
 simpletestOOX ooxFile targetMethod expectedResult = testOOX ooxFile targetMethod expectedResult 30
 testOOX ooxFile targetMethod expectedResult depth =
-    TestLabel (ooxFile ++ " -- " ++ targetMethod)
+    let label = ooxFile ++ " -- " ++ targetMethod
+    in
+    TestLabel label
     $ TestCase
     $ do
+      putStrLn ("\n>>> " ++ label)
       (vresult,stat) <- execute $ config0 { fileName = ooxFile , entryPoint = targetMethod, maximumDepth=depth}
       let (pass, oracleName) = expectedResult vresult
       assertBool oracleName pass
 
 testOOX_withLargerArray ooxFile targetMethod expectedResult depth =
-    TestLabel (ooxFile ++ " -- " ++ targetMethod)
+    let label = ooxFile ++ " -- " ++ targetMethod
+    in
+    TestLabel label
     $ TestCase
     $ do
+      putStrLn ("\n>>> " ++ label)
       (vresult,stat) <- execute $ config0 { fileName = ooxFile , entryPoint = targetMethod, maximumDepth=depth, symbolicArraySize=4}
       let (pass, oracleName) = expectedResult vresult
       assertBool oracleName pass
@@ -55,9 +61,12 @@ expectInvalid ooxResult = (isInvalid ooxResult, "the target oox-program is INVAL
 expectDeadlock ooxResult = (isDeadlock ooxResult, "the target oox-program contains DEADLOCK")
 -- for testing concurrent program:
 testOOX_concur ooxFile targetMethod expectedResult depth =
-  TestLabel (ooxFile ++ " -- " ++ targetMethod)
+  let label = ooxFile ++ " -- " ++ targetMethod
+  in
+  TestLabel label
   $ TestCase
   $ do
+    putStrLn ("\n>>> " ++ label)
     (vresult,stat) <- execute $ config0 { fileName = ooxFile , entryPoint = targetMethod, maximumDepth=depth, applyPOR = True}
     let (pass, oracleName) = expectedResult vresult
     assertBool oracleName pass
@@ -131,8 +140,15 @@ tsuite_locks1 = ("tsuite_locks1",
 --
 tsuite_arrays = ("tsuite_arrays",
    TestList [
-      simpletestOOX "./examples/array/array1.oox" "Main.foo1" expectValid,
-      simpletestOOX "./examples/array/array1.oox" "Main.foo1_invalid" expectInvalid
+      --simpletestOOX "./examples/array/array1.oox" "Main.foo" expectValid,
+      --simpletestOOX "./examples/array/array1.oox" "Main.foo_invalid" expectInvalid,
+      --simpletestOOX "./examples/array/array1.oox" "Main.max" expectValid,
+      --simpletestOOX "./examples/array/array1.oox" "Main.max_invalid1" expectInvalid,
+      --simpletestOOX "./examples/array/array1.oox" "Main.max_invalid2" expectInvalid,
+      --testOOX_concur "./examples/array/array1.oox" "Main.sort" expectValid 100,
+      --testOOX_concur "./examples/array/array1.oox" "Main.sort_invalid1" expectInvalid 100,
+      testOOX_concur "./examples/array/array2.oox" "Main.foo" expectValid 100
+
    ])
 
 tsuitex = ("bla", TestList [

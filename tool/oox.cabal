@@ -40,6 +40,7 @@ executable ooxvy
                           , Execution.Semantics.Evaluation
                           , Execution.Semantics.PartialOrderReduction
                           , Execution.Semantics.Assignment
+                          , Execution.Semantics.AssertAssume
                           , Execution.State
                           , Execution.State.PathConstraints
                           , Execution.State.LockSet

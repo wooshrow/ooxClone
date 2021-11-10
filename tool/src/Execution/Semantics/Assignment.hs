@@ -6,15 +6,17 @@ module Execution.Semantics.Assignment(
 import qualified GHC.Stack as GHC
 import qualified Data.Set as S
 import           Control.Monad (foldM)
+import           Control.Applicative
 import           Control.Monad.Extra
 import           Control.Lens ((^?!), (^.))
-import           Text.Pretty
+import           Text.Pretty as Pretty
 import           Analysis.Type.Typeable
 import           Execution.State
 import           Execution.State.Heap
 import           Execution.State.AliasMap as AliasMap
 import           Execution.Effects
 import           Execution.Errors
+import           Execution.Semantics.AssertAssume
 import           Execution.Semantics.Evaluation
 import           Execution.Semantics.Heap
 import           Execution.Semantics.StackFrame
@@ -22,6 +24,7 @@ import           Execution.Semantics.Concretization
 import           Language.Syntax
 import qualified Language.Syntax.Lenses as SL
 
+-- update the store pointed to by lhs with the given symbolic value
 execLhs :: GHC.HasCallStack => ExecutionState -> Lhs -> Expression -> Engine r ExecutionState
 execLhs state0 lhs@LhsVar{} value =
     writeDeclaration state0 (lhs ^?! SL.var) value
@@ -29,22 +32,51 @@ execLhs state0 lhs@LhsVar{} value =
 execLhs state0 lhs@LhsField{} value = do
     let field = lhs ^?! SL.field
     ref <- readDeclaration state0 (lhs ^?! SL.var)
+    worker state0 field ref
+    {-
     case ref of
-        Lit NullLit{} _ _ -> 
+        Lit NullLit{} _ _ ->
             infeasible
-        Ref{} -> 
+        Ref{} ->
             writeConcreteField state0 (ref ^?! SL.ref) field value
         SymbolicRef{} -> do
             state1 <- initializeSymbolicRef state0 ref
             state2 <- removeSymbolicNull state1 ref
             writeSymbolicField state2 ref field value
-        _ -> 
+        Conditional guard trueExpr falseExpr ty info -> do
+            state1 <- execAssume state0 guard
+            let notGuard = UnOp Negate guard ty info
+            state2 <- execAssume state0 notGuard
+            -- debug (">>> rhs: " ++ show value)
+            execLhs state1 lhs value <|> execLhs state2 lhs value
+            --stop state0 (expectedReferenceErrorMessage ref)
+        _ ->
             stop state0 (expectedReferenceErrorMessage ref)
-            
+    -}
+    where
+    worker state0 field ref =  case ref of
+      Lit NullLit{} _ _ ->
+          infeasible
+      Ref{} ->
+          writeConcreteField state0 (ref ^?! SL.ref) field value
+      SymbolicRef{} -> do
+          state1 <- initializeSymbolicRef state0 ref
+          state2 <- removeSymbolicNull state1 ref
+          writeSymbolicField state2 ref field value
+      Conditional guard trueExpr falseExpr ty info -> do
+          state1 <- execAssume state0 guard
+          let notGuard = UnOp Negate guard ty info
+          state2 <- execAssume state0 notGuard
+          -- debug (">>> rhs: " ++ show value)
+          worker state1 field trueExpr <|> worker state2 field falseExpr
+          --stop state0 (expectedReferenceErrorMessage ref)
+      _ ->
+          stop state0 (expectedReferenceErrorMessage ref)
+
 execLhs state0 lhs@LhsElem{} value = do
     ref <- readDeclaration state0 (lhs ^?! SL.var)
     case ref of
-        Lit NullLit{} _ _ -> 
+        Lit NullLit{} _ _ ->
             infeasible
         Ref{} -> do
             (state1, index) <- evaluateAsInt state0 (lhs ^?! SL.index)
@@ -53,14 +85,14 @@ execLhs state0 lhs@LhsElem{} value = do
             (state1, concretizations) <- concretesOfType state0 ARRAYRuntimeType ref
             concretize concretizations state1 $ \ state2 ->
                 case AliasMap.lookup symRef (state2 ^. aliasMap) of
-                    Just refs 
+                    Just refs
                         | length refs == 1 -> do
                             (state3, index) <- evaluateAsInt state2 (lhs ^?! SL.index)
                             let (Ref ref _ _) = S.elemAt 0 refs
                             writeElem state3 ref index value
                         | otherwise ->
                             stop state2 (exactlyOneAliasErrorMessage (length refs))
-                    Nothing -> 
+                    Nothing ->
                         stop state2 noAliasesErrorMessage
         _ ->
             stop state0 (expectedReferenceErrorMessage ref)
@@ -76,14 +108,14 @@ execRhs state0 rhs@RhsExpression{} = do
 execRhs state rhs@RhsField{} = do
     ref <- readDeclaration state (rhs ^?! SL.var ^?! SL.var)
     execRhsField state ref (rhs ^?! SL.field)
-  
+
 execRhs state0 rhs@RhsElem{} = do
     let var = rhs ^?! SL.var ^?! SL.var
     ref <- readDeclaration state0 var
     case ref of
-        Lit NullLit{} _ _ -> 
+        Lit NullLit{} _ _ ->
             infeasible
-        SymbolicRef ref _ _ -> 
+        SymbolicRef ref _ _ ->
             case AliasMap.lookup ref (state0 ^. aliasMap) of
                 Just aliases
                     | length aliases == 1 -> do
@@ -91,9 +123,9 @@ execRhs state0 rhs@RhsElem{} = do
                         debug ("Overwritting '" ++ toString var ++ "' with single alias '" ++ toString alias ++ "'")
                         state1 <- writeDeclaration state0 var alias
                         execRhs state1 rhs
-                    | otherwise -> 
+                    | otherwise ->
                         stop state0 (exactlyOneAliasErrorMessage (S.size aliases))
-                Nothing -> 
+                Nothing ->
                     stop state0 noAliasesErrorMessage
         Ref{} -> do
             (state1, index) <- evaluateAsInt state0 (rhs ^?! SL.index)
@@ -102,7 +134,7 @@ execRhs state0 rhs@RhsElem{} = do
         _ ->
             stop state0 (expectedReferenceErrorMessage ref)
 
-execRhs state0 rhs@RhsArray{} = do 
+execRhs state0 rhs@RhsArray{} = do
     (state1, sizes) <- mapAccumM evaluateAsInt state0 (rhs ^?! SL.sizes)
     execNewArray state1 sizes (typeOf rhs)
 
@@ -115,10 +147,10 @@ execRhsField state0 (Conditional guard true0 false0 ty info) field =  do
     (state2, false1) <- execRhsField state1 false0 field
     return (state2, Conditional guard true1 false1 ty info)
 
-execRhsField _ (Lit NullLit{} _ _) _ = 
+execRhsField _ (Lit NullLit{} _ _) _ =
     infeasible
 
-execRhsField state (Ref ref _ _) field = 
+execRhsField state (Ref ref _ _) field =
     (state,) <$> readConcreteField state ref field
 
 execRhsField state0 ref@SymbolicRef{} field = do

@@ -10,6 +10,22 @@ class Point {
 class Main
 {
 
+    static void foo(Point[] a, int i, int k)
+          requires(a != null && #a > 1
+                   && 0 <= i && i < #a
+                   && 0 <= k && k < #a)
+    {
+       Point o := a[i] ;
+       o.x := 0 ;
+       int m := 0;
+       while (m < #a) {
+          o := a[m] ;
+          int v := o.x ;
+          assert v == 0 ;
+          m := m+1 ;
+       }
+    }
+
 
     // A Bubblesort algorithm.
     static Point[] sort(Point[] array)

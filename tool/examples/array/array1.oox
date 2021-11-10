@@ -1,7 +1,10 @@
+//
+// Some examples with arrays of primitives (int)
+//
 class Main
 {
     // A combination between symbolic array and symbolic index.
-    static void foo1(int[] a, int i, int k)
+    static void foo(int[] a, int i, int k)
         requires(a != null && #a > 1
                  && 0 <= i && i < #a
                  && 0 <= k && k < #a
@@ -15,7 +18,7 @@ class Main
         assert value >= 0;
     }
 
-    static void foo1_invalid(int[] a, int i, int k)
+    static void foo_invalid(int[] a, int i, int k)
         requires(a != null && #a > 1
                  && 0 <= i && i < #a
                  && 0 <= k && k < #a
@@ -53,9 +56,66 @@ class Main
         return array;
     }
 
+    static int[] sort_invalid1(int[] array)
+        requires(array != null)
+        ensures(forall v, i : retval : forall w, j : retval : i < j ==> v < w) // bug, should be <=
+        exceptional(false)
+    {
+        bool sorted := false;
+        while (!sorted) {
+            sorted := true;
+            int i := 1;
+            while (i < #array) {
+                int a := array[i];
+                int b := array[i - 1];
+                if (a < b) {
+                    array[i] := b;
+                    array[i - 1] := a;
+                    sorted := false;
+                }
+                i := i + 1;
+            }
+        }
+        return array;
+    }
+
     // Find the maximum element in the array.
     static int max(int[] array)
+        requires(array != null && #array>0)
+        ensures(forall v, i : array : retval >= v)
+        exceptional(false) // should not throw an exception
+    {
+        int i := 1;
+        int max := array[0];
+        while (i < #array) {
+            int elem := array[i];
+            if (elem > max) {
+                max := elem;
+            }
+            i := i + 1;
+        }
+        return max;
+    }
+
+    static int max_invalid1(int[] array)
         requires(array != null)
+        ensures(forall v, i : array : retval >= v)
+        exceptional(false) // this variation can throw an exception
+    {
+        int i := 1;
+        int max := array[0]; // this may now now throw an exception
+        while (i < #array) {
+            int elem := array[i];
+            if (elem > max) {
+                max := elem;
+            }
+            i := i + 1;
+        }
+        return max;
+    }
+
+    static int max_invalid2(int[] array)
+        requires(array != null && #array>0)
         ensures(forall v, i : array : retval >= v)
         exceptional(false)
     {
@@ -68,6 +128,6 @@ class Main
             }
             i := i + 1;
         }
-        return max;
+        return max-1 ; // this will violate the post-cond
     }
 }
