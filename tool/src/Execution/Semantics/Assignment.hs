@@ -22,6 +22,7 @@ import           Execution.Semantics.Heap
 import           Execution.Semantics.StackFrame
 import           Execution.Semantics.Concretization
 import           Language.Syntax
+import           Data.Statistics
 import qualified Language.Syntax.Lenses as SL
 
 -- update the store pointed to by lhs with the given symbolic value
@@ -33,26 +34,6 @@ execLhs state0 lhs@LhsField{} value = do
     let field = lhs ^?! SL.field
     ref <- readDeclaration state0 (lhs ^?! SL.var)
     worker state0 field ref
-    {-
-    case ref of
-        Lit NullLit{} _ _ ->
-            infeasible
-        Ref{} ->
-            writeConcreteField state0 (ref ^?! SL.ref) field value
-        SymbolicRef{} -> do
-            state1 <- initializeSymbolicRef state0 ref
-            state2 <- removeSymbolicNull state1 ref
-            writeSymbolicField state2 ref field value
-        Conditional guard trueExpr falseExpr ty info -> do
-            state1 <- execAssume state0 guard
-            let notGuard = UnOp Negate guard ty info
-            state2 <- execAssume state0 notGuard
-            -- debug (">>> rhs: " ++ show value)
-            execLhs state1 lhs value <|> execLhs state2 lhs value
-            --stop state0 (expectedReferenceErrorMessage ref)
-        _ ->
-            stop state0 (expectedReferenceErrorMessage ref)
-    -}
     where
     worker state0 field ref =  case ref of
       Lit NullLit{} _ _ ->
@@ -63,11 +44,15 @@ execLhs state0 lhs@LhsField{} value = do
           state1 <- initializeSymbolicRef state0 ref
           state2 <- removeSymbolicNull state1 ref
           writeSymbolicField state2 ref field value
+      -- well, this might also occur:
       Conditional guard trueExpr falseExpr ty info -> do
           state1 <- execAssume state0 guard
           let notGuard = UnOp Negate guard ty info
           state2 <- execAssume state0 notGuard
           -- debug (">>> rhs: " ++ show value)
+          -- split based on the condition, and recurse back to the worker
+          -- to solve each:
+          measureBranches [True,False]
           worker state1 field trueExpr <|> worker state2 field falseExpr
           --stop state0 (expectedReferenceErrorMessage ref)
       _ ->
