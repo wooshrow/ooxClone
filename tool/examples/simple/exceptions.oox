@@ -82,6 +82,42 @@ class Main
         catch { x := 2 ; }
     }
 
+    static void arrayExc1(int x, Item[] a)
+        requires(x==0)
+        ensures(a != null && #a>0 && x==1)
+        exceptional((a == null || #a==0) && x==0)
+    {
+        Item v := a[0] ;
+        x := 1 ;
+    }
+
+    static void arrayExc2(int x, Item[] a)
+        requires(x==0 && a != null)
+        ensures(a != null && #a>0 && x==1)
+        exceptional(#a==0 && x==0)
+    {
+        Item v := a[0] ;
+        x := 1 ;
+    }
+
+    static void arrayExc3(int x, Item[] a)
+        requires(x>=0 && a != null && #a==1)
+        ensures(#a==1 && x==1)
+        exceptional(x>0)
+    {
+        Item v := a[x] ;
+        x := x+1 ;
+    }
+
+    static void arrayExc4(int x, Item[] a)
+        requires(x<=0 && a != null && #a==1)
+        ensures(#a==1 && x==1)
+        exceptional(x<0)
+    {
+        Item v := a[x] ;
+        x := x+1 ;
+    }
+
 }
 
 class Item {

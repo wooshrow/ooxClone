@@ -165,7 +165,11 @@ tsuite_exceptions = ("tsuite_exceptions",
      simpletestOOX "./examples/simple/exceptions.oox" "Main.m3_invalid1" expectInvalid,
      simpletestOOX "./examples/simple/exceptions.oox" "Main.m3_invalid2" expectInvalid,
      simpletestOOX "./examples/simple/exceptions.oox" "Main.nullExc1" expectValid,
-     simpletestOOX "./examples/simple/exceptions.oox" "Main.nullExc2" expectValid
+     simpletestOOX "./examples/simple/exceptions.oox" "Main.nullExc2" expectValid,
+     simpletestOOX "./examples/simple/exceptions.oox" "Main.arrayExc1" expectValid,
+     simpletestOOX "./examples/simple/exceptions.oox" "Main.arrayExc2" expectValid,
+     simpletestOOX "./examples/simple/exceptions.oox" "Main.arrayExc3" expectValid,
+     simpletestOOX "./examples/simple/exceptions.oox" "Main.arrayExc4" expectValid
   ] )
 
 tsuitex = ("bla", TestList [
@@ -202,3 +206,4 @@ main = do
   runTestSuite tsuite_concursimple1
   runTestSuite tsuite_locks1
   runTestSuite tsuite_arrays
+  runTestSuite tsuite_exceptions
