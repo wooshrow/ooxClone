@@ -1,0 +1,25 @@
+//
+// fix This
+//
+class Main
+{
+    static void m1(List list)
+        exceptional(....)
+    {
+
+        List next := list ;
+        next := next.next;
+        next := next.next;
+        //assert next == list.next ;  can't do list.next
+    }
+}
+
+class List
+{
+    List next;
+
+    List()
+    {
+        ;
+    }
+}

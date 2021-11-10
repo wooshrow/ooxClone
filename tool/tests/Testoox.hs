@@ -21,7 +21,7 @@ config0 =  Configuration
    , verifyEnsures = True
    , verifyExceptional = True
    , verifyRequires = True
-   , symbolicNulls  = False
+   , symbolicNulls  = True
    , symbolicAliases  = False
    , symbolicArraySize = 2
    , cacheFormulas = True
@@ -172,6 +172,56 @@ tsuite_exceptions = ("tsuite_exceptions",
      simpletestOOX "./examples/simple/exceptions.oox" "Main.arrayExc4" expectValid
   ] )
 
+--
+-- Some tests involving object strucures
+--
+tsuite_objstructures = ("tsuite_objstructures",
+  TestList [
+     -- simpletestOOX "./examples/simple/simplelist.oox" "Main.m1" expectValid
+  ])
+
+--
+-- Test vs some simple data structures
+--
+tsuite_datastructures = ("tsuite_datastructures",
+  TestList [
+       testOOX_concur "./examples/intLinkedlist.oox" "Node.test1" expectInvalid 50,
+       testOOX_concur "./examples/intLinkedlist.oox" "Node.test2" expectValid 100,
+       testOOX_concur "./examples/intLinkedlist.oox" "Node.test2_invalid" expectInvalid 50,
+       testOOX_concur "./examples/intLinkedlist.oox" "Node.test3" expectValid 100,
+       testOOX_concur "./examples/intLinkedlist.oox" "Node.test3_invalid1" expectInvalid 80,
+       testOOX_concur "./examples/intLinkedlist.oox" "Node.test3_invalid2" expectInvalid 80
+  ])
+--
+-- Test vs some example algorithms
+--
+tsuite_algorithms = ("tsuite_algorithms",
+  TestList [
+       testOOX_concur "./examples/bubblesort.oox" "Main.sort" expectValid 1000,
+       testOOX_concur "./examples/fib.oox" "Main.main" expectValid 40,
+       -- concurrent mergesort requires a more elaborate setup:
+       TestLabel ("./examples/mergesort.oox" ++ " -- " ++ "Main.sort")
+         $ TestCase
+         $ do
+            (vresult,_) <- execute $ config0 {
+                             fileName = "./examples/mergesort.oox" ,
+                             entryPoint = "Main.sort",
+                             symbolicArraySize = 5,
+                             applyPOR = True,
+                             maximumDepth = 200}
+            assertBool "the target is valid" (isValid vresult),
+       TestLabel ("./examples/mergesortMUTCMP2.oox" ++ " -- " ++ "Main.sort")
+         $ TestCase
+         $ do
+            (vresult,_) <- execute $ config0 {
+                             fileName = "./examples/mergesortMUTCMP2.oox" ,
+                             entryPoint = "Main.sort",
+                             symbolicArraySize = 5,
+                             applyPOR = True,
+                             maximumDepth = 200}
+            assertBool "the target is invalid" (isInvalid vresult)
+  ])
+
 tsuitex = ("bla", TestList [
        -- testOOX_concur concursimpel1_oox "Main.mFive" expectValid 100
        --testOOX_withLargerArray "./examples/array.oox" "Main.foo_1" expectValid 100,
@@ -207,3 +257,5 @@ main = do
   runTestSuite tsuite_locks1
   runTestSuite tsuite_arrays
   runTestSuite tsuite_exceptions
+  runTestSuite tsuite_datastructures
+  runTestSuite tsuite_algorithms

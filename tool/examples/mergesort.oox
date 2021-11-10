@@ -1,3 +1,6 @@
+//
+// A concurrent version of merge-sort on int-array.
+//
 class Main {
     static int[] sort(int[] array)
         requires(!(array == null))
