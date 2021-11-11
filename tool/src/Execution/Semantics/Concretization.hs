@@ -1,5 +1,6 @@
 module Execution.Semantics.Concretization(
       Concretization
+    , isEmptyConcretizations
     , concretizeWithResult
     , concretize
     , concretizeMap
@@ -44,6 +45,12 @@ import           Execution.Semantics.StackFrame
 
 type Concretization = M.Map Identifier Expression
 
+-- true if c is an empty list of concretizations
+isEmptyConcretizations :: [Concretization] -> Bool
+isEmptyConcretizations []  = True
+isEmptyConcretizations [c] = M.null c
+isEmptyConcretizations _   = False
+
 concretizeWithResult :: GHC.HasCallStack => [Concretization] -> ExecutionState -> (ExecutionState -> Engine r (ExecutionState, a)) -> Engine r (ExecutionState, a)
 concretizeWithResult [] state f = f state
 concretizeWithResult cs state f = do
@@ -53,6 +60,7 @@ concretizeWithResult cs state f = do
 concretize :: GHC.HasCallStack => [Concretization] -> ExecutionState -> (ExecutionState -> Engine r ExecutionState) -> Engine r ExecutionState
 concretize [] state f = f state
 concretize cs state f = do
+    -- this introduces branching in computation for each concretization proposed:
     measureBranches cs
     foldr (\ x a -> f (concretize' state x) <|> a) empty cs
 

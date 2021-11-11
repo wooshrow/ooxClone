@@ -173,14 +173,6 @@ tsuite_exceptions = ("tsuite_exceptions",
   ] )
 
 --
--- Some tests involving object strucures
---
-tsuite_objstructures = ("tsuite_objstructures",
-  TestList [
-     -- simpletestOOX "./examples/simple/simplelist.oox" "Main.m1" expectValid
-  ])
-
---
 -- Test vs some simple data structures
 --
 tsuite_datastructures = ("tsuite_datastructures",

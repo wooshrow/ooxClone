@@ -244,6 +244,7 @@ execDeclare state0 ty var = do
     let value = defaultValue ty
     writeDeclaration state0 var value
 
+
 execLock :: GHC.HasCallStack => ExecutionState -> Identifier -> Engine r ExecutionState
 execLock state0 var = do
     ref <- readDeclaration state0 var
@@ -252,13 +253,15 @@ execLock state0 var = do
         SymbolicRef{}     -> do
             -- if ref is a symbolic-ref of type array, concretize it:
             --debug (">>> trying to concretize " ++ show ref)
-            (state1, concretizations1) <- concretesOfType state0 ARRAYRuntimeType ref
-            (state2, concretizations2) <- concretesOfType state1 REFRuntimeType ref
-            --debug (">>> done concretizing " ++ show ref)
-            --ref2 <- readDeclaration state0 var
-            --debug (">>> new ref: " ++ show ref2)
-            concretize (concretizations1 ++ concretizations2) state2 $ \ state3 ->
-                execLock state3 var
+            -- concretize ref, should be either an array or reference (but not both):
+            (state1a, concretizations1a) <- concretesOfType state0 ARRAYRuntimeType ref
+            (state1b, concretizations1b) <- concretesOfType state0 REFRuntimeType ref
+            let (state2,concretizations2) = if isEmptyConcretizations concretizations1a
+                   then (state1b, concretizations1b)
+                   else (state1a, concretizations1a)
+            --debug (">>> concretizing " ++ show ref)
+            --debug (">>> concretizaiton: " ++ show concretizations2)
+            concretize concretizations2 state2 $ \ state3 -> execLock state3 var
         Ref ref _ _ ->
             case state0 ^. currentThreadId of
                 Just currentTid ->
