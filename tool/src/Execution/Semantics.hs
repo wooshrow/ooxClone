@@ -253,7 +253,8 @@ execLock state0 var = do
         SymbolicRef{}     -> do
             -- if ref is a symbolic-ref of type array, concretize it:
             --debug (">>> trying to concretize " ++ show ref)
-            -- concretize ref, should be either an array or reference (but not both):
+            -- Concretize ref, should be either an array or reference (but not both).
+            -- Simply merging them with ++ triggers a wrong behavior:
             (state1a, concretizations1a) <- concretesOfType state0 ARRAYRuntimeType ref
             (state1b, concretizations1b) <- concretesOfType state0 REFRuntimeType ref
             let (state2,concretizations2) = if isEmptyConcretizations concretizations1a
