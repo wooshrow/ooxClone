@@ -1,0 +1,47 @@
+// The program checks if x is an element of the array a.
+
+// N is an experiment parameter; replace it with a concrete value in [2..10].
+// Below I will use maximum N, namely 10.
+
+class PVbenchmark {
+
+    static bool memberOf(int x, int[] a)
+       requires(a != null && #a>0)
+       ensures(retval)
+       exceptional(false)
+       {
+       // N is an experiment parameter,
+       // setting to max N=10:
+       int N := 10 ;
+       assume #a>=N && #a>=0
+              && (exists v,k : a : v==x) ;
+       int k := 0 ;
+       bool found := false ;
+       while (k<#a) { // deliberately iterating till the end of array
+          int v := a[k] ;
+          if (v==x) found := true ;
+          k := k+1 ;
+       }
+       return found ;
+    }
+
+    static bool memberOf_invalid(int x, int[] a)
+       requires(a != null && #a>0)
+       ensures(!retval)
+       exceptional(false)
+       {
+       // N is an experiment parameter,
+       // setting to max N=10:
+       int N := 10 ;
+       assume #a>=N && #a>=0
+              && (exists v,k : a : v==x) ;
+       int k := 0 ;
+       bool found := false ;
+       while (k<#a) { // deliberately iterating till the end of array
+          int v := a[k] ;
+          if (v==x) found := true ;
+          k := k+1 ;
+       }
+       return found ;
+    }
+}

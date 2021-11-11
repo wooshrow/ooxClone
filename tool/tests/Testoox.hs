@@ -45,14 +45,14 @@ testOOX ooxFile targetMethod expectedResult depth =
       let (pass, oracleName) = expectedResult vresult
       assertBool oracleName pass
 
-testOOX_withLargerArray ooxFile targetMethod expectedResult depth =
+testOOX_withLargerArray ooxFile targetMethod expectedResult maxarraySize depth =
     let label = ooxFile ++ " -- " ++ targetMethod
     in
     TestLabel label
     $ TestCase
     $ do
       putStrLn ("\n>>> " ++ label)
-      (vresult,stat) <- execute $ config0 { fileName = ooxFile , entryPoint = targetMethod, maximumDepth=depth, symbolicArraySize=4}
+      (vresult,stat) <- execute $ config0 { fileName = ooxFile , entryPoint = targetMethod, maximumDepth=depth, symbolicArraySize=maxarraySize}
       let (pass, oracleName) = expectedResult vresult
       assertBool oracleName pass
 
@@ -214,13 +214,20 @@ tsuite_algorithms = ("tsuite_algorithms",
             assertBool "the target is invalid" (isInvalid vresult)
   ])
 
+tsuite_pvbenchmark = ("tsuite_pvbenchmark",
+  TestList [
+    --testOOX_withLargerArray "./examples/benchmarkpv/memberOf.oox" "PVbenchmark.memberOf" expectValid 10 300,
+    --testOOX_withLargerArray "./examples/benchmarkpv/memberOf.oox" "PVbenchmark.memberOf_invalid" expectInvalid 10 300,
+    --testOOX_concur "./examples/benchmarkpv/divByN.oox" "PVbenchmark.divByN" expectValid 150,
+    --testOOX_concur "./examples/benchmarkpv/divByN.oox" "PVbenchmark.divByN_invalid" expectInvalid 150
+    --testOOX_withLargerArray "./examples/benchmarkpv/pullUp.oox" "PVbenchmark.pullUp" expectValid 10 300,
+    --testOOX_withLargerArray "./examples/benchmarkpv/pullUp.oox" "PVbenchmark.pullUp" expectValid 10 300,
+    testOOX_withLargerArray "./examples/benchmarkpv/min.oox" "PVbenchmark.min" expectValid 10 500,
+    testOOX_withLargerArray "./examples/benchmarkpv/min.oox" "PVbenchmark.min_invalid" expectInvalid 10 500
+  ])
+
 tsuitex = ("bla", TestList [
-       -- testOOX_concur concursimpel1_oox "Main.mFive" expectValid 100
-       --testOOX_withLargerArray "./examples/array.oox" "Main.foo_1" expectValid 100,
-       --testOOX_withLargerArray "./examples/array.oox" "Main.sort" expectValid 100,
-       --testOOX_withLargerArray "./examples/array.oox" "Main.max" expectValid 100
-       testOOX_withLargerArray "./examples/array2.oox" "Main.sort" expectValid 100
-       --testOOX_withLargerArray "./examples/array.oox" "Main.max" expectValid 100
+       testOOX_withLargerArray "./examples/benchmarkpv/pullUp.oox" "PVbenchmark.pullUp" expectValid 10 300
       ])
 
 -- for running a testsiute:
