@@ -214,16 +214,23 @@ tsuite_algorithms = ("tsuite_algorithms",
             assertBool "the target is invalid" (isInvalid vresult)
   ])
 
+--
+-- Run this test-suite to run oox againt PV-benchmark set
+--
 tsuite_pvbenchmark = ("tsuite_pvbenchmark",
   TestList [
-    --testOOX_withLargerArray "./examples/benchmarkpv/memberOf.oox" "PVbenchmark.memberOf" expectValid 10 300,
-    --testOOX_withLargerArray "./examples/benchmarkpv/memberOf.oox" "PVbenchmark.memberOf_invalid" expectInvalid 10 300,
-    --testOOX_concur "./examples/benchmarkpv/divByN.oox" "PVbenchmark.divByN" expectValid 150,
-    --testOOX_concur "./examples/benchmarkpv/divByN.oox" "PVbenchmark.divByN_invalid" expectInvalid 150
-    --testOOX_withLargerArray "./examples/benchmarkpv/pullUp.oox" "PVbenchmark.pullUp" expectValid 10 300,
-    --testOOX_withLargerArray "./examples/benchmarkpv/pullUp.oox" "PVbenchmark.pullUp" expectValid 10 300,
+    testOOX_withLargerArray "./examples/benchmarkpv/memberOf.oox" "PVbenchmark.memberOf" expectValid 10 300,
+    testOOX_withLargerArray "./examples/benchmarkpv/memberOf.oox" "PVbenchmark.memberOf_invalid" expectInvalid 10 300,
+    testOOX_concur "./examples/benchmarkpv/divByN.oox" "PVbenchmark.divByN" expectValid 150,
+    testOOX_concur "./examples/benchmarkpv/divByN.oox" "PVbenchmark.divByN_invalid" expectInvalid 150,
+    testOOX_withLargerArray "./examples/benchmarkpv/pullUp.oox" "PVbenchmark.pullUp" expectValid 10 300,
+    testOOX_withLargerArray "./examples/benchmarkpv/pullUp.oox" "PVbenchmark.pullUp" expectValid 10 300,
     testOOX_withLargerArray "./examples/benchmarkpv/min.oox" "PVbenchmark.min" expectValid 10 500,
-    testOOX_withLargerArray "./examples/benchmarkpv/min.oox" "PVbenchmark.min_invalid" expectInvalid 10 500
+    testOOX_withLargerArray "./examples/benchmarkpv/min.oox" "PVbenchmark.min_invalid" expectInvalid 10 500,
+    testOOX_withLargerArray "./examples/benchmarkpv/find12.oox" "PVbenchmark.find12" expectValid 10 300,
+    testOOX_withLargerArray "./examples/benchmarkpv/find12.oox" "PVbenchmark.find12_invalid" expectInvalid 10 300,
+    testOOX_withLargerArray "./examples/benchmarkpv/bsort.oox" "PVbenchmark.bsort" expectValid 5 400,
+    testOOX_withLargerArray "./examples/benchmarkpv/bsort.oox" "PVbenchmark.bsort_invalid" expectInvalid 5 400
   ])
 
 tsuitex = ("bla", TestList [

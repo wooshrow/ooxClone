@@ -9,10 +9,12 @@
 
 class PVbenchmark {
 
-    static Num min(int[] a, Num x, Num u, Num m) {
+    static Num min(int[] a, Num x, Num u, Num m)
+        requires(a != null)
+    {
       // setting N to 10:
       int N := 10 ;
-      assume a != null && #a>0 && #a==N
+      assume #a>0 && #a==N
              && x != null
              && (forall v,i : a : v>0) ;
       int k := 0 ;
@@ -37,10 +39,12 @@ class PVbenchmark {
       return m ;
     }
 
-    static Num min_invalid(int[] a, Num x, Num u, Num m) {
+    static Num min_invalid(int[] a, Num x, Num u, Num m)
+      requires(a != null)
+      {
       // setting N to 10:
       int N := 10 ;
-      assume a != null && #a>0 && #a==N
+      assume #a>0 && #a==N
              && x != null
              && (forall v,i : a : v>0) ;
       int k := 0 ;

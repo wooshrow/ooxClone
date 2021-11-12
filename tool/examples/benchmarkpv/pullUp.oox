@@ -7,7 +7,9 @@
 
 class PVbenchmark {
 
-    static int[] pullUp(int step, int[] a) {
+    static int[] pullUp(int step, int[] a)
+        requires(a != null)
+    {
 
        // N is an experiment parameter
        int N := 10 ;
@@ -38,7 +40,9 @@ class PVbenchmark {
        return a ;
     }
 
-    static int[] pullUp_invalid(int step, int[] a) {
+    static int[] pullUp_invalid(int step, int[] a)
+        requires(a != null)
+    {
 
        // N is an experiment parameter
        int N := 10 ;
