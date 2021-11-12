@@ -42,7 +42,7 @@ class Main {
    // is also verified, implipying that the new POR does not drop
    // critical interleavings.
    // valid
-   static void testOne(int whatever) {
+   static void test1(int whatever) {
         Item o := new Item(whatever) ;
         Item p := new Item(whatever + 1) ;
         fork Main.incrOne(o) ;
@@ -55,10 +55,10 @@ class Main {
 
    // A case where the original peep-hole POR would explode.
    // The new POR scales up. The assertion is also verified,
-   // implipying that it does not drop critical interleavings.
+   // implying that it does not drop critical interleavings.
    //
    // valid
-   static void testTwo(int whatever) {
+   static void test2(int whatever) {
         Item o := new Item(whatever) ;
         Item p := new Item(whatever + 1) ;
         Item q := new Item(whatever + 1) ;
@@ -78,7 +78,7 @@ class Main {
 
    // Notice that incrOneWithLoop uses a loop to increase o.x four times.
    // valid
-   static void testThree(int whatever) {
+   static void test3(int whatever) {
         Item o := new Item(whatever) ;
         Item p := new Item(whatever + 1) ;
         fork Main.incrOneWithLoop(o) ;
@@ -109,7 +109,8 @@ class Main {
    // Because non-local actions will only be executed until the program can no
    // longer do any local-action, the assert in checkOne() above will never be
    // checked either.
-   static void testFour(int whatever) {
+   static void test4(int whatever) {
+        assume whatever > 0 ;
         Item o := new Item(whatever) ;
         Item p := new Item(whatever + 1) ;
         fork Main.aLongLocalLoop() ;

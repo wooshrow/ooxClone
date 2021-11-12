@@ -184,6 +184,7 @@ tsuite_datastructures = ("tsuite_datastructures",
        testOOX_concur "./examples/intLinkedlist.oox" "Node.test3_invalid1" expectInvalid 80,
        testOOX_concur "./examples/intLinkedlist.oox" "Node.test3_invalid2" expectInvalid 80
   ])
+
 --
 -- Test vs some example algorithms
 --
@@ -214,6 +215,16 @@ tsuite_algorithms = ("tsuite_algorithms",
             assertBool "the target is invalid" (isInvalid vresult)
   ])
 
+--
+-- Some small tests for POR
+--
+tsuite_por = ("tsuite_por",
+  TestList [
+    testOOX_concur "./examples/simple/testPOR.oox" "Main.test1" expectValid 100,
+    testOOX_concur "./examples/simple/testPOR.oox" "Main.test2" expectValid 200,
+    testOOX_concur "./examples/simple/testPOR.oox" "Main.test3" expectValid 300,
+    testOOX_concur "./examples/simple/testPOR.oox" "Main.test4" expectValid 1000
+  ])
 --
 -- Run this test-suite to run oox againt PV-benchmark set
 --
@@ -265,3 +276,4 @@ main = do
   runTestSuite tsuite_exceptions
   runTestSuite tsuite_datastructures
   runTestSuite tsuite_algorithms
+  runTestSuite tsuite_por
