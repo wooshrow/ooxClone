@@ -1,0 +1,76 @@
+
+// Expecting VALID
+
+// Just some class so that we can use the lock to its instances
+class Dummy {
+    Dummy() { ; }
+}
+
+class System {
+
+     int i ;
+     int j ;
+     int NUM ; // experiment parameter
+     Dummy atomicgate ;
+
+     System() {
+         this.i := 1 ;
+         this.j := 1 ;
+         this.NUM := 6 ;
+         this.atomicgate := new Dummy() ;
+     }
+
+     static void thread1(System sys) {
+        int k := 0;
+        Dummy atomicgate := sys.atomicgate ;
+        int NUM := sys.NUM ;
+        while (k < NUM) {
+            lock(atomicgate) {
+               int i := sys.i ;
+               int j := sys.j ;
+               sys.i := i + j ;
+            }
+            k := k+1 ;
+        }
+     }
+
+     static void thread2(System sys) {
+        int k := 0;
+        Dummy atomicgate := sys.atomicgate ;
+        int NUM := sys.NUM ;
+        while (k < NUM) {
+            lock(atomicgate) {
+               int i := sys.i ;
+               int j := sys.j ;
+               sys.j := j + i ;
+            }
+            k := k+1 ;
+        }
+     }
+}
+
+class Main {
+
+    static void main() {
+
+         System system := new System() ;
+         fork System.thread1(system) ;
+         fork System.thread2(system) ;
+
+         bool condI ;
+         bool condJ ;
+         Dummy atomicgate := system.atomicgate ;
+         lock(atomicgate) {
+             int i := system.i ;
+             condI := i > 377;
+         }
+         lock(atomicgate) {
+             int j := system.j ;
+             condJ := j > 377;
+         }
+
+         assert !(condI || condJ) ;
+         //assert false ;
+    }
+
+}

@@ -225,6 +225,22 @@ tsuite_por = ("tsuite_por",
     testOOX_concur "./examples/simple/testPOR.oox" "Main.test3" expectValid 300,
     testOOX_concur "./examples/simple/testPOR.oox" "Main.test4" expectValid 1000
   ])
+
+--
+-- Testing floating points reasoning
+--
+tsuite_float = ("tsuite_float",
+  TestList [
+    simpletestOOX "./examples/simple/float.oox" "Main.test1" expectValid,
+    simpletestOOX "./examples/simple/float.oox" "Main.test2a_invalid" expectInvalid,
+    simpletestOOX "./examples/simple/float.oox" "Main.test2b_invalid" expectInvalid,
+    simpletestOOX "./examples/simple/float.oox" "Main.test2c_invalid" expectInvalid,
+    -- this one FAILS. OOx refuses to do float division. Fix TODO.
+    simpletestOOX "./examples/simple/float.oox" "Main.test2d_invalid" expectInvalid,
+    -- this one crashes too.
+    -- Seems that oox floating point handling is just incomplete. TODO
+    simpletestOOX "./examples/simple/float.oox" "Main.test3" expectValid
+  ])
 --
 -- Run this test-suite to run oox againt PV-benchmark set
 --
@@ -242,6 +258,27 @@ tsuite_pvbenchmark = ("tsuite_pvbenchmark",
     testOOX_withLargerArray "./examples/benchmarkpv/find12.oox" "PVbenchmark.find12_invalid" expectInvalid 10 300,
     testOOX_withLargerArray "./examples/benchmarkpv/bsort.oox" "PVbenchmark.bsort" expectValid 5 400,
     testOOX_withLargerArray "./examples/benchmarkpv/bsort.oox" "PVbenchmark.bsort_invalid" expectInvalid 5 400
+  ])
+
+--
+-- test-suites to run oox against SV Benchmark
+--
+tsuite_SVBbenchmark = ("tsuite_SVB",
+  TestList [
+    --testOOX_withLargerArray "./examples/benchmarksvcomp/java/jayhorn-recursive/SatAckermann01.oox" "Main.checkDepth" expectInvalid 2 120,
+    --testOOX_withLargerArray "./examples/benchmarksvcomp/java/jayhorn-recursive/SatAckermann01.oox" "Main.main" expectValid 2 120,
+    --testOOX_withLargerArray "./examples/benchmarksvcomp/java/jayhorn-recursive/UnsatAckermann01.oox" "Main.main" expectInvalid 2 120
+    --testOOX_withLargerArray "./examples/benchmarksvcomp/java/algorithms/RedBlackTree-MemSat01.oox" "Main.checkDepth" expectInvalid 6 300,
+    --testOOX_withLargerArray "./examples/benchmarksvcomp/java/algorithms/RedBlackTree-MemSat01.oox" "Main.main" expectValid 6 300,
+    --testOOX_withLargerArray "./examples/benchmarksvcomp/java/algorithms/RedBlackTree-MemUnsat01.oox" "Main.main" expectInvalid 6 300,
+    --testOOX_withLargerArray "./examples/benchmarksvcomp/java/algorithms/RedBlackTree-FunSat01.oox" "Main.main" expectValid 6 300,
+    --testOOX_withLargerArray "./examples/benchmarksvcomp/java/algorithms/RedBlackTree-FunUnsat01.oox" "Main.main" expectInvalid 6 300
+    --testOOX_withLargerArray "./examples/benchmarksvcomp/java/MinePump/spec1-5_product64.oox" "Main.checkDepth" expectInvalid 12 500,
+    --testOOX_withLargerArray "./examples/benchmarksvcomp/java/MinePump/spec1-5_product64.oox" "Main.main" expectValid 12 500,
+    --testOOX_withLargerArray "./examples/benchmarksvcomp/java/MinePump/spec1-5_product56.oox" "Main.main" expectInvalid 12 500,
+    --testOOX_concur "./examples/benchmarksvcomp/c/pthread/fib_bench_longer-1.oox" "Main.main" expectValid 270
+    testOOX_concur "./examples/benchmarksvcomp/c/pthread/fib_bench_longer-2.oox" "Main.main" expectInvalid 270
+
   ])
 
 tsuitex = ("bla", TestList [
@@ -262,6 +299,7 @@ runTestSuite suite = do
      else do
           putStrLn ("** " ++ suiteName ++ ": all tests pass.")
           return ()
+
 
 
 

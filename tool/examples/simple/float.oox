@@ -1,0 +1,37 @@
+// for testing that oox can handle floats
+
+class Main {
+
+  static void test1() {
+       float x := 0.005 ;
+       assert x == x ;
+       assert x == 0.005 ;
+       assert x != x+0.001 ;
+       assert x != 0.004 ;
+  }
+
+  // invalid
+  static void test2a_invalid() {
+       float x := 0.005 ;
+       assert x == x + 0.001 ;
+  }
+
+  static void test2b_invalid() {
+       float x := 0.005 ;
+       assert x == x - 0.001 ;
+  }
+  static void test2c_invalid() {
+       float x := 0.005 ;
+       assert x == x * 0.001 ;
+  }
+
+  static void test2d_invalid() {
+       float x := 0.005 ;
+       // assert x == x / 0.001 ;  // <== oox refuses float division. TODO
+  }
+
+  static void test3(float x, float y) {
+      float z := x + 0.5 ; // oox crashes :|
+      assert z == z ;
+  }
+}

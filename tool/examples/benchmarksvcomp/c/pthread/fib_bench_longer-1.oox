@@ -1,0 +1,64 @@
+// Expecting VALID
+
+class State {
+
+     int i ;
+     int j ;
+
+     State() {
+         this.i := 1 ;
+         this.j := 1 ;
+     }
+
+     static void thread1(State state) {
+        int k := 0;
+        // NUM is 6
+        while (k < 6) {
+            lock(state) {
+               int i := state.i ;
+               int j := state.j ;
+               state.i := i + j ;
+            }
+            k := k+1 ;
+        }
+     }
+
+     static void thread2(State state) {
+        int k := 0;
+        // NUM is 6
+        while (k < 6) {
+            lock(state) {
+               int i := state.i ;
+               int j := state.j ;
+               state.j := j + i ;
+            }
+            k := k+1 ;
+        }
+     }
+}
+
+class Main {
+
+    static void main()    {
+
+         State state := new State() ;
+         bool condI ;
+         bool condJ ;
+         fork State.thread1(state) ;
+         fork State.thread2(state) ;
+
+         lock(state) {
+             int i := state.i ;
+             condI := i > 377;
+         }
+         lock(state) {
+             int j := state.j ;
+             condJ := j > 377;
+         }
+
+         //join ;
+         assert !(condI || condJ) ;
+         //assert false ;
+    }
+
+}
