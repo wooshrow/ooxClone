@@ -14,9 +14,9 @@ class Counter {
     int current;
 
     Counter(int initial) {
-        this.current := initial; 
+        this.current := initial;
     }
-        
+
     void increment() {
         lock(this) {
             int value := this.count;
@@ -37,9 +37,9 @@ class Counter {
         int value := counter.current;
         assertvalue == initial + N;
     }
-                
-    static void main(int initial) { 
-        count(initial, 4); 
+
+    static void main(int initial) {
+        count(initial, 4);
     }
 }
 ```
@@ -80,3 +80,7 @@ The OOX verification tool can be tweaked using the following set of parameters.
 | The logging level | `--inform` | `-i` | | `-i 1` |
 
 For example, the command `oox "program.oox" -f "Program.main" -k 150 -i 0` verifies the function `main` in the class `Program` in the program `program.oox` up to a maximum depth of `150` with logging disabled.
+
+### Paper
+
+Stefan Koppier, [_The Path Explosion Problem in Symbolic Execution, an Approach to the Effects of Concurrency and Aliasing_](./doc/koppier_thesis.pdf). Master thesis, Utrecht University, 2020.
