@@ -39,26 +39,24 @@ class State {
 
 class Main {
 
-    static void main(int x) {
+    static void main() {
 
          State state := new State() ;
-         //state.i := x ;
-         //assume 0<x && x<2 ;
          bool condI ;
          bool condJ ;
          fork State.thread1(state) ;
          fork State.thread2(state) ;
 
          lock(state) {
-            int i := state.i ;
-            condI := i >= 377  ;
-            //condI := i == 2  ;
-            int j := state.j ;
-            condJ := j >= 377;
-            //condJ := j == 7 ;
+             int i := state.i ;
+             condI := i >= 377;
          }
+         lock(state) {
+             int j := state.j ;
+             condJ := j >= 377;
+         }
+
          assert !(condI || condJ) ;
-         //assert !condI ;
          //assert false ;
     }
 

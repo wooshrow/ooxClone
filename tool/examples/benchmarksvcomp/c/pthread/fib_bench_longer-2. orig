@@ -715,25 +715,18 @@ t2(void* arg)
   pthread_exit(((void *)0));
 }
 int
-main(int start, char **argv)
+main(char **argv)
 {
   pthread_t id1, id2;
-  i = start ;
-  j = start ;
-
   pthread_create(&id1, ((void *)0), t1, ((void *)0));
   pthread_create(&id2, ((void *)0), t2, ((void *)0));
   __VERIFIER_atomic_begin();
   int condI = i >= 377  ;
-  //int condI = i == 129 && i > argc ;
   __VERIFIER_atomic_end();
   __VERIFIER_atomic_begin();
   int condJ = j >= 377  ;
-  //  int condJ = j == 3 ;
   __VERIFIER_atomic_end();
-  __VERIFIER_assume(start == 1) ;
   if (condI || condJ) {
-  //if (condI && condJ) {
     ERROR: {reach_error();abort();}
   }
   return 0;

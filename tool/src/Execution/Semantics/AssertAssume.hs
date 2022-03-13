@@ -1,9 +1,12 @@
+{-# LANGUAGE BangPatterns #-}
+
 module Execution.Semantics.AssertAssume(
       execAssert
     , execAssume
 ) where
 
 import Debug.Trace
+--import Control.DeepSeq
 import qualified GHC.Stack as GHC
 import qualified Data.Set as S
 import qualified Data.Map as M
@@ -58,7 +61,8 @@ execAssume :: GHC.HasCallStack => ExecutionState -> Expression -> Engine r Execu
 execAssume state0 assumption0 = do
     (state1, concretizations) <- concretesOfType state0 ARRAYRuntimeType assumption0
     concretize concretizations state1 $ \ state2 -> do
-        (state3, assumption1) <- evaluateAsBool state2 assumption0
+        (state3, assumption1_) <- evaluateAsBool state2 assumption0
+        let !assumption1 = assumption1_
         case assumption1 of
             Right True  ->
                 return state3

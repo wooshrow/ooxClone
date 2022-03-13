@@ -84,3 +84,24 @@ For example, the command `oox "program.oox" -f "Program.main" -k 150 -i 0` verif
 ### Paper
 
 Stefan Koppier, [_The Path Explosion Problem in Symbolic Execution, an Approach to the Effects of Concurrency and Aliasing_](./doc/koppier_thesis.pdf). Master thesis, Utrecht University, 2020.
+
+### Examples and Benchmark
+
+They can be found under `examples`. They include two benchmarks: `benchmarkpv` contains programs from the PSV-course and `benchmarksvcomp` contains selected programs from the SV-Comp set.
+
+There is a test script  `tests\Testoox.hs` from where you can run OOX on example-sets and benchmarks:
+
+* Do `> cabal v2-repl` from CLI.
+* Then from ghci `:l ./tests/Testoox.hs`
+* Once loaded, do for example: `runTestSuite tsuite_simple1`
+
+
+### Tool workflow
+
+* Top level: `Main.hs`. This parses the source file, then does an analysis-phase, and then execution-phase.
+   * The parsing is done by the function `parsingPhase` from `Parsing/Phase.hs`. The parser produces a value of type `Sem r CompilationUnit`. The type `Sem` is from _Polysemy_.
+   * The analysis is done by the function `analysisPhase` from `Analysis/Phase.hs`
+
+### Other notes
+
+* Function that evaluates path-condition: `execAssume` in the module `Execution.Semantics.AssertAssume`. This in turn calls `evaluateAsBool` in the module `Execution.Semantics.Evaluation`.

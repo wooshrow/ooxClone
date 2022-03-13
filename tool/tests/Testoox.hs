@@ -268,16 +268,16 @@ tsuite_SVBbenchmark = ("tsuite_SVB",
     --testOOX_withLargerArray "./examples/benchmarksvcomp/java/jayhorn-recursive/SatAckermann01.oox" "Main.checkDepth" expectInvalid 2 120,
     --testOOX_withLargerArray "./examples/benchmarksvcomp/java/jayhorn-recursive/SatAckermann01.oox" "Main.main" expectValid 2 120,
     --testOOX_withLargerArray "./examples/benchmarksvcomp/java/jayhorn-recursive/UnsatAckermann01.oox" "Main.main" expectInvalid 2 120
-    testOOX_withLargerArray "./examples/benchmarksvcomp/java/algorithms/RedBlackTree-MemSat01.oox" "Main.checkDepth" expectInvalid 6 300,
-    testOOX_withLargerArray "./examples/benchmarksvcomp/java/algorithms/RedBlackTree-MemSat01.oox" "Main.main" expectValid 6 300,
-    testOOX_withLargerArray "./examples/benchmarksvcomp/java/algorithms/RedBlackTree-MemUnsat01.oox" "Main.main" expectInvalid 6 300,
-    testOOX_withLargerArray "./examples/benchmarksvcomp/java/algorithms/RedBlackTree-FunSat01.oox" "Main.main" expectValid 6 300,
-    testOOX_withLargerArray "./examples/benchmarksvcomp/java/algorithms/RedBlackTree-FunUnsat01.oox" "Main.main" expectInvalid 6 300
+    --testOOX_withLargerArray "./examples/benchmarksvcomp/java/algorithms/RedBlackTree-MemSat01.oox" "Main.checkDepth" expectInvalid 6 300,
+    --testOOX_withLargerArray "./examples/benchmarksvcomp/java/algorithms/RedBlackTree-MemSat01.oox" "Main.main" expectValid 6 300,
+    --testOOX_withLargerArray "./examples/benchmarksvcomp/java/algorithms/RedBlackTree-MemUnsat01.oox" "Main.main" expectInvalid 6 300,
+    --testOOX_withLargerArray "./examples/benchmarksvcomp/java/algorithms/RedBlackTree-FunSat01.oox" "Main.main" expectValid 6 300,
+    --testOOX_withLargerArray "./examples/benchmarksvcomp/java/algorithms/RedBlackTree-FunUnsat01.oox" "Main.main" expectInvalid 6 300
     --testOOX_withLargerArray "./examples/benchmarksvcomp/java/MinePump/spec1-5_product64.oox" "Main.checkDepth" expectInvalid 12 500,
     --testOOX_withLargerArray "./examples/benchmarksvcomp/java/MinePump/spec1-5_product64.oox" "Main.main" expectValid 12 500,
     --testOOX_withLargerArray "./examples/benchmarksvcomp/java/MinePump/spec1-5_product56.oox" "Main.main" expectInvalid 12 500
     --testOOX_concur "./examples/benchmarksvcomp/c/pthread/fib_bench_longer-1.oox" "Main.main" expectValid 270
-    --testOOX_concur "./examples/benchmarksvcomp/c/pthread/fib_bench_longer-2.oox" "Main.main" expectInvalid 270
+    testOOX_concur "./examples/benchmarksvcomp/c/pthread/fib_bench_longer-2.oox" "Main.main" expectInvalid 270
 
   ])
 

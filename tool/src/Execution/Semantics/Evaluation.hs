@@ -1,4 +1,4 @@
-{-# LANGUAGE LiberalTypeSynonyms #-}
+{-# LANGUAGE LiberalTypeSynonyms, BangPatterns #-}
 
 module Execution.Semantics.Evaluation(
       EvaluationResult
@@ -42,10 +42,14 @@ evaluateAsInt state0 expression = do
 evaluateAsBool :: GHC.HasCallStack => ExecutionState -> Expression -> Engine r (ExecutionState, EvaluationResult Bool)
 evaluateAsBool state0 expression = do
     debug ("Evaluating '" ++ toString expression ++ "' as a bool")
-    (state1, result) <- evaluate state0 expression
+    (state1, result_) <- evaluate state0 expression
+    let !result = result_
     case result of
         (Lit (BoolLit value _) _ _) -> measureLocalSolve >> return (state1, Right value)
         _                           -> return (state1, Left result)
+
+
+
 
 evaluate :: GHC.HasCallStack => ExecutionState -> Expression -> Engine r (ExecutionState, Expression)
 evaluate state expression = do
@@ -63,57 +67,57 @@ substitute state0 expression = foldExpression algebra expression state0
                            , Cache Expression
                            , State Statistics
                            , Embed IO
-                           , Trace] r, 
-                    GHC.HasCallStack) 
+                           , Trace] r,
+                    GHC.HasCallStack)
                 => ExpressionAlgebra (ExecutionState -> Sem r (ExecutionState, Expression))
         algebra = ExpressionAlgebra
             { fForall = evaluateQuantifier ands'
 
             , fExists = evaluateQuantifier ors'
-            
+
             , fBinOp = \ binOp lhs0 rhs0 ty pos state1 -> do
                 (state2, lhs1) <- lhs0 state1
                 (state3, rhs1) <- rhs0 state2
                 return (state3, BinOp binOp lhs1 rhs1 ty pos)
-                
+
             , fUnOp = \ unOp expr0 ty pos state1 -> do
                 (state2, expr1) <- expr0 state1
                 return (state2, UnOp unOp expr1 ty pos)
-                
+
             , fVar = \ var _ _ state1 -> do
                 ref <- readDeclaration state1 var
                 case ref of
                     SymbolicRef{} -> do
                         state2 <- initializeSymbolicRef state1 ref
                         return (state2, ref)
-                    _             -> 
+                    _             ->
                         return (state1, ref)
-                
+
             , fSymVar = \ var ty pos state1 ->
                 return (state1, SymbolicVar var ty pos)
-                
-            , fLit = \ lit ty pos state1 -> 
+
+            , fLit = \ lit ty pos state1 ->
                 return (state1, Lit lit ty pos)
-                
+
             , fSizeOf = \ var _ _ state1 -> do
                 ref <- readDeclaration state1 var
-                case ref of 
-                    Lit NullLit{} _ _ -> 
+                case ref of
+                    Lit NullLit{} _ _ ->
                         infeasible
                     Ref{} -> do
                         size <- fmap (lit' . intLit') (sizeof state1 (ref ^?! SL.ref))
                         return (state1, size)
-                    _ -> 
+                    _ ->
                         stop state1 (expectedConcreteReferenceErrorMessage ref)
 
             , fRef = \ ref ty pos state1 ->
                 return (state1, Ref ref ty pos)
-                
+
             , fSymRef = \ var ty pos state1 -> do
                 let ref = SymbolicRef var ty pos
                 state2 <- initializeSymbolicRef state1 ref
                 return (state2, ref)
-                
+
             , fCond = \ guard0 true0 false0 ty pos state1 -> do
                 (state2, guard1) <- guard0 state1
                 (state3, true1)  <- true0 state2
@@ -130,53 +134,53 @@ evaluate' state0 expression = foldExpression algebra expression state0
                            , State Statistics
                            , Embed IO
                            , Trace] r
-                    , GHC.HasCallStack) 
+                    , GHC.HasCallStack)
                 => ExpressionAlgebra (ExecutionState -> Sem r (ExecutionState, Expression))
         algebra = ExpressionAlgebra
             { fForall = evaluateQuantifier ands'
-            
-            , fExists = evaluateQuantifier ors' 
-           
+
+            , fExists = evaluateQuantifier ors'
+
             , fBinOp = \ binOp lhs0 rhs0 ty pos state1 -> do
                 (state2, lhs1) <- lhs0 state1
                 (state3, rhs1) <- rhs0 state2
                 value <- evaluateBinOp state1 binOp lhs1 rhs1 ty pos
                 return (state3, value)
-                
+
             , fUnOp = \ unOp value0 ty pos state1 -> do
                 (state2, value1) <- value0 state1
                 value2 <- evaluateUnOp unOp value1 ty pos
                 return (state2, value2)
-                
+
             , fVar = \ var _ _ state1 -> do
                 value <- readDeclaration state1 var
                 return (state1, value)
-                
-            , fSymVar = \ var ty pos state1 -> 
+
+            , fSymVar = \ var ty pos state1 ->
                 return (state1, SymbolicVar var ty pos)
-                
-            , fLit = \ lit ty pos state1 -> 
+
+            , fLit = \ lit ty pos state1 ->
                 return (state1, Lit lit ty pos)
-                
+
             , fSizeOf = \ var _ _ state1 -> do
                 ref <- readDeclaration state1 var
                 case ref of
-                    Lit NullLit {} _ _ -> 
+                    Lit NullLit {} _ _ ->
                         infeasible
                     Ref{} -> do
                         size <- fmap (lit' . intLit') (sizeof state1 (ref ^?! SL.ref))
                         return (state1, size)
-                    _ -> 
+                    _ ->
                         stop state1 (expectedConcreteReferenceErrorMessage ref)
 
-            , fRef = \ ref ty pos state1 -> 
+            , fRef = \ ref ty pos state1 ->
                 return (state1, Ref ref ty pos)
-            
+
             , fSymRef = \ ref ty pos state1 -> do
                 let expr = SymbolicRef ref ty pos
                 state2 <- initializeSymbolicRef state1 expr
                 return (state2, expr)
-                
+
             , fCond = \ guard0 true0 false0 ty pos state1 -> do
                 (state2, guard1) <- guard0 state1
                 case guard1 of
@@ -191,7 +195,7 @@ evaluateQuantifier :: GHC.HasCallStack => ([Expression] -> Expression) -> Identi
 evaluateQuantifier quantifier element range domain formula _ _ state0 = do
     ref <- readDeclaration state0 domain
     case ref of
-        Lit NullLit{} _ _ -> 
+        Lit NullLit{} _ _ ->
             infeasible
         Ref{} ->
             case dereference state0 (ref ^?! SL.ref) of
@@ -215,19 +219,19 @@ evaluateBinOp :: GHC.HasCallStack => ExecutionState -> BinOp -> Expression -> Ex
 evaluateBinOp state op (Lit (BoolLit a _) _ _) (Lit (BoolLit b _) _ _) ty pos = do
     lit <- case op of Implies  -> return (BoolLit (not a || b)); And   -> return (BoolLit (a && b))
                       Or       -> return (BoolLit (a || b))    ; Equal -> return (BoolLit (a == b))
-                      NotEqual -> return (BoolLit (a /= b))    
+                      NotEqual -> return (BoolLit (a /= b))
                       _        -> stop state unsupportedOperatorErrorMessage
     return $ Lit (lit pos) ty pos
 
 evaluateBinOp __ op expressionA@(Lit (BoolLit a _) _ _) expressionB ty pos =
-    return $ case op of 
+    return $ case op of
         Implies -> if a then expressionB else Lit (BoolLit True pos) ty pos
         And     -> if a then expressionB else Lit (BoolLit False pos) ty pos
         Or      -> if a then Lit (BoolLit True pos) ty pos else expressionB
         _       -> BinOp op expressionA expressionB ty pos
-        
+
 evaluateBinOp _ op expressionA expressionB@(Lit (BoolLit b _) _ _) ty pos =
-    return $ case op of 
+    return $ case op of
         Implies -> if b then Lit (BoolLit True pos) ty pos else UnOp Negate expressionA ty pos
         And     -> if b then expressionA else Lit (BoolLit False pos) ty pos
         Or      -> if b then Lit (BoolLit True pos) ty pos else expressionA
@@ -248,11 +252,11 @@ evaluateBinOp state op (Lit (IntLit a _) _ _) (Lit (IntLit b _) _ _) ty pos = do
 
 -- Reference Evaluation
 evaluateBinOp state op (Ref a _ _) (Ref b _ _) ty pos = do
-    lit <- case op of Equal    -> return (BoolLit (a == b)) 
+    lit <- case op of Equal    -> return (BoolLit (a == b))
                       NotEqual -> return (BoolLit (a /= b))
                       _        -> stop state unsupportedOperatorErrorMessage
     return $ Lit (lit pos) ty pos
-    
+
 evaluateBinOp state op Ref{} (Lit (NullLit _) _ _) ty pos = do
     lit <- case op of Equal    -> return (BoolLit False)
                       NotEqual -> return (BoolLit True)
@@ -272,7 +276,7 @@ evaluateBinOp state op (Lit (NullLit _) _ _) (Lit (NullLit _) _ _) ty pos = do
     return $ Lit (lit pos) ty pos
 
 evaluateBinOp state op expressionA@(SymbolicRef a _ _) expressionB@(SymbolicRef b _ _) ty pos
-    | a == b 
+    | a == b
         = case op of
                 Equal    -> return $ Lit (BoolLit True pos) ty pos
                 NotEqual -> return $ Lit (BoolLit False pos) ty pos

@@ -25,6 +25,7 @@ module Language.Syntax(
 import GHC.Generics    (Generic)
 import Data.Positioned
 import Data.Hashable
+--import Control.DeepSeq
 
 --------------------------------------------------------------------------------
 -- Top-level definitions
@@ -40,7 +41,7 @@ data Declaration
 
 instance Eq Declaration where
     (Class _ _ posX) == (Class _ _ posY) = posX == posY
-    
+
 instance Ord Declaration where
     (Class _ _ posX) <= (Class _ _ posY) = posX <= posY
 
@@ -57,7 +58,7 @@ data DeclarationMember
 
 instance Eq DeclarationMember where
     a == b = _info (a :: DeclarationMember) == _info (b :: DeclarationMember)
-        
+
 instance Ord DeclarationMember where
     a <= b = _info (a :: DeclarationMember) <= _info (b :: DeclarationMember)
 
@@ -111,7 +112,7 @@ data Invocation
     = InvokeMethod { _lhs :: Identifier, _rhs :: Identifier, _arguments :: [Expression], _resolved :: Maybe (Declaration, DeclarationMember), _info :: Position }
     | InvokeConstructor { _className :: Identifier, _arguments :: [Expression], _resolved :: Maybe (Declaration, DeclarationMember), _info :: Position }
     deriving (Show)
- 
+
 instance WithPos Invocation where
     getPos = _info
 
@@ -152,10 +153,12 @@ data Expression
     | Conditional { _guard :: Expression, _true :: Expression, _false :: Expression, _ty :: RuntimeType, _info :: Position }
     deriving (Show)
 
+--instance NFData Expression
+
 instance Eq Expression where
-    (Forall elemA rangeA domainA formulaA _ _) == (Forall elemB rangeB domainB formulaB _ _) 
+    (Forall elemA rangeA domainA formulaA _ _) == (Forall elemB rangeB domainB formulaB _ _)
         = elemA == elemB && rangeA == rangeB && domainA == domainB && formulaA == formulaB
-    (Exists elemA rangeA domainA formulaA _ _) == (Forall elemB rangeB domainB formulaB _ _) 
+    (Exists elemA rangeA domainA formulaA _ _) == (Forall elemB rangeB domainB formulaB _ _)
         = elemA == elemB && rangeA == rangeB && domainA == domainB && formulaA == formulaB
     (BinOp opA lhsA rhsA _ _) == (BinOp opB lhsB rhsB _ _)
         = opA == opB && lhsA == lhsB && rhsA == rhsB
@@ -166,7 +169,7 @@ instance Eq Expression where
     (SymbolicVar varA _ _) == (SymbolicVar varB _ _)
         = varA == varB
     (Lit litA _ _) == (Lit litB _ _)
-        = litA == litB    
+        = litA == litB
     (SizeOf varA _ _) == (SizeOf varB _ _)
         = varA == varB
     (Ref refA _ _) == (Ref refB _ _)
@@ -178,9 +181,9 @@ instance Eq Expression where
     _ == _ = False
 
 instance Ord Expression where
-    (Forall elemA rangeA domainA formulaA _ _) <= (Forall elemB rangeB domainB formulaB _ _) 
+    (Forall elemA rangeA domainA formulaA _ _) <= (Forall elemB rangeB domainB formulaB _ _)
         = elemA <= elemB && rangeA <= rangeB && domainA <= domainB && formulaA <= formulaB
-    (Exists elemA rangeA domainA formulaA _ _) <= (Forall elemB rangeB domainB formulaB _ _) 
+    (Exists elemA rangeA domainA formulaA _ _) <= (Forall elemB rangeB domainB formulaB _ _)
         = elemA <= elemB && rangeA <= rangeB && domainA <= domainB && formulaA <= formulaB
     (BinOp opA lhsA rhsA _ _) <= (BinOp opB lhsB rhsB _ _)
         = opA <= opB && lhsA <= lhsB && rhsA <= rhsB
@@ -191,7 +194,7 @@ instance Ord Expression where
     (SymbolicVar varA _ _) <= (SymbolicVar varB _ _)
         = varA <= varB
     (Lit litA _ _) <= (Lit litB _ _)
-        = litA <= litB    
+        = litA <= litB
     (SizeOf varA _ _) <= (SizeOf varB _ _)
         = varA <= varB
     (Ref refA _ _) <= (Ref refB _ _)
@@ -229,9 +232,9 @@ instance Hashable Expression where
 instance WithPos Expression where
     getPos = _info
 
-data BinOp 
-    = Implies  | And           | Or          | Equal            | NotEqual 
-    | LessThan | LessThanEqual | GreaterThan | GreaterThanEqual | Plus 
+data BinOp
+    = Implies  | And           | Or          | Equal            | NotEqual
+    | LessThan | LessThanEqual | GreaterThan | GreaterThanEqual | Plus
     | Minus    | Multiply      | Divide      | Modulo
     deriving (Show, Eq, Ord, Generic)
 
@@ -240,7 +243,7 @@ instance Hashable BinOp
 data UnOp
     = Negative | Negate
     deriving (Show, Eq, Ord, Generic)
-    
+
 instance Hashable UnOp
 
 data Lit
