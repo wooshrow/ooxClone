@@ -57,13 +57,12 @@ OOX is developed with GHC, and is tested using GHC 8.10.2. It also requires the 
 
 Simply use the command `cabal v2-build` to build or `cabal v2-repl` to interactively use OOX. Cabal will ensure that the required Haskell packages are installed. The [Z3 package](https://hackage.haskell.org/package/z3) will require a bit more work, as it requires the Z3 bindings. On Windows, the fields `extra-include-dirs` and `extra-lib-dirs` can be added to the Cabal configuration file located in the user-specific AppData.
 
-**Linux (Ubuntu)**
-1. _recommended_: install [GHCup](https://www.haskell.org/ghcup/) to install required Cabal & GHC version
+**Step-by-step installation (Ubuntu)**
+1. _recommended_: install [GHCup](https://www.haskell.org/ghcup/) to manage Cabal & GHC versions
 2. Install GHC 8.10.2
 3. Install Cabal 3.6.2.0
-4. `$ sudo apt-get z3`
-5. `$ sudo apt-get install z3` (make sure version 4.8.8 is installed)
-6. Start by using `cabal v2-repl`
+4. `sudo apt-get install z3` (must be version 4.8.8)
+5. Start with `cabal v2-repl oox -- ARGUMENTS`
 
 ### Usage
 
